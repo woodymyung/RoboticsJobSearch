@@ -7,11 +7,14 @@
 
 ```
 JD/
-├── index.html            # 두 CSV를 불러와 join + 검색/필터/정렬/스크랩/숨김 UI
-├── jobs.csv              # 공고 데이터 (id=사람인 rec_idx 기준 누적 관리)
-├── companies.csv         # 회사 데이터 (id=csn 기준, 매출/사원수) — jobs와 company_id로 매칭
-├── serve.py              # 로컬 서버 + '🔄 갱신' 버튼용 /scrape 엔드포인트
+├── index.html                  # 두 CSV를 불러와 join + 검색/필터/정렬/스크랩/숨김 UI
+├── research.html               # 기업 심층(딥) 리서치 별도 페이지 — 공고 표와 상호 연결
+├── jobs.csv                    # 공고 데이터 (id=사람인 rec_idx 기준 누적 관리)
+├── companies.csv               # 회사 데이터 (id=csn 기준, 매출/사원수) — jobs와 company_id로 매칭
+├── companies_deepresearch.csv  # 기업 딥리서치 데이터 (회사명 기준, research.html이 렌더)
+├── serve.py                    # 로컬 서버 + '🔄 갱신' 버튼용 /scrape 엔드포인트
 ├── README.md
+├── server/                     # (선택) 개인화 백엔드 — Cloudflare Worker (닉네임별 찜/숨김 동기화). server/README.md 참고
 └── scraper/
     ├── config.py             # ★ 공통 검색 키워드 + 직무 분류 규칙 + CSV 스키마 (여기만 고치면 됨)
     ├── saramin_web.py        # 공고 스크래퍼 (requests+bs4, 키 불필요·실동작)
@@ -49,6 +52,7 @@ python3 serve.py          # → http://localhost:8000
 - **⭐ 스크랩(찜) / 🚫 숨김**: 로그인 시 서버 저장, 미로그인 시 localStorage. 새로고침·재부팅해도 유지. **찜 CSV 내보내기** 가능
 - **마감 공고**: 흐리게 + `마감` 뱃지. '마감 숨기기' 체크로 감출 수 있음
 - **페이지네이션**: 페이지당 20건 + 하단 네비게이터
+- **기업 심층 리서치 연결**: 딥리서치가 있는 회사는 공고 행에 **자세히** 링크가 붙어 `research.html`(별도 페이지)로 연결. 상단 **사원수 200명 이상 딥리서치 보기** 링크로도 이동 (아래 *기업 심층 리서치* 참고)
 
 ---
 
@@ -136,7 +140,23 @@ id, name, revenue, employees, founded, biz_type, industry, homepage, last_update
 
 ---
 
-## 6. 사이트별 전략 / 한계
+## 6. 기업 심층 리서치 (`research.html` + `companies_deepresearch.csv`)
+
+규모 있는(예: 사원수 200명 이상) 회사를 대상으로 **본업·신사업·미래 전략·로보틱스 타겟팅 포인트**를 정리한 딥리서치를 **별도 페이지**(`research.html`)로 분리해 보여준다.
+
+- **상호 연결**: 공고 표의 행에서 **자세히** → `research.html?company=...`로 해당 회사 리서치 카드로 이동. 반대로 리서치 페이지의 **이 회사 채용 공고 보기** → `index.html?company=...`로 그 회사 공고를 필터링.
+- **데이터**: `companies_deepresearch.csv`(회사명 기준). 스크래퍼가 만드는 게 아니라 별도로 작성/큐레이션하는 리서치 결과물이다.
+
+### CSV 스키마
+```
+# companies_deepresearch.csv
+name, main_business, new_business, future, targeting_point, sources, confidence
+```
+`name`은 `jobs.csv`/`companies.csv`의 회사명과 일치시켜 join한다. `sources`는 ` | `로 구분한 출처 링크, `confidence`는 신뢰도(high/…).
+
+---
+
+## 7. 사이트별 전략 / 한계
 
 | 소스 | 방식 | 비고 |
 |---|---|---|
