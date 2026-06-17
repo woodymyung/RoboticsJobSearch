@@ -55,23 +55,34 @@
   .pager button:hover:not(:disabled){border-color:var(--accent);}
   .pager button.cur{background:var(--accent);color:#fff;border-color:var(--accent);font-weight:700;}
   .pager button:disabled{opacity:.35;cursor:default;}
+  /* Lucide 아이콘 */
+  .lucide{width:16px;height:16px;vertical-align:-3px;stroke-width:2;display:inline-block;}
+  h1 .lucide{width:24px;height:24px;vertical-align:-5px;color:var(--accent);}
+  .filters button .lucide{width:14px;height:14px;vertical-align:-2px;}
+  .starbtn .lucide{width:18px;height:18px;vertical-align:middle;}
+  .starbtn.on .lucide{fill:currentColor;}
+  .hidebtn .lucide{width:12px;height:12px;vertical-align:-1px;}
+  .sicon .lucide{width:13px;height:13px;vertical-align:-2px;}
+  .pager button .lucide{width:14px;height:14px;vertical-align:-2px;}
+  .ticon{color:var(--muted);display:flex;align-items:center;}
 </style>
 </head>
 <body>
 <header>
-  <h1>🤖 로보틱스·자동화 신입 지원 가능 채용 리스트</h1>
+  <h1><i data-lucide="bot"></i> 로보틱스·자동화 신입 지원 가능 채용 리스트</h1>
   <div class="sub">데이터 소스: <code>jobs.csv</code> + <code>companies.csv</code> (ID 매칭) · 사람인 라이브 스크래핑</div>
 </header>
 
 <div class="note">
-  ⭐ <b>스크랩(찜)</b> — 마음에 드는 공고의 별을 누르면 저장됩니다(브라우저에 보관). <b>⭐찜</b> 필터로 모아보고,
-  <b>찜 CSV 내보내기</b>로 따로 받을 수 있어요. · 연봉은 사람인 목록에 없으면 '미기재', 매출액은 DART 키 연동 시 표시됩니다.
+  <i data-lucide="star"></i> <b>스크랩(찜)</b> — 마음에 드는 공고의 별을 누르면 저장됩니다(브라우저에 보관). <b>찜</b> 필터로 모아보고,
+  <b>찜 CSV 내보내기</b>로 따로 받을 수 있어요. · 매출액은 DART 기준, 없으면 '알 수 없음'으로 표시됩니다.
   <br>로컬에서 표가 비면 같은 폴더에서 <code>python3 -m http.server</code> 실행 후 접속하거나 아래로 직접 불러오세요:
   <input type="file" id="file" accept=".csv" style="margin-top:8px;color:var(--muted)">
 </div>
 
 <div class="toolbar">
-  <input type="search" id="q" placeholder="🔍 회사·직무·근무지·조건·출처 검색">
+  <span class="ticon"><i data-lucide="search"></i></span>
+  <input type="search" id="q" placeholder="회사·직무·근무지·조건·출처 검색">
   <div class="filters" id="filters">
     <button class="active" data-f="all">전체</button>
     <button data-f="기획/PM">기획/PM</button>
@@ -79,12 +90,12 @@
     <button data-f="필드엔지니어">필드엔지니어</button>
     <button data-f="생산/제조">생산/제조</button>
     <button data-f="영업">영업</button>
-    <button data-f="fav">⭐ 찜</button>
-    <button data-f="hidden">🚫 숨김</button>
+    <button data-f="fav"><i data-lucide="star"></i> 찜</button>
+    <button data-f="hidden"><i data-lucide="eye-off"></i> 숨김</button>
   </div>
-  <select id="region" title="근무지(시/도) 필터"><option value="all">📍 근무지 전체</option></select>
+  <select id="region" title="근무지(시/도) 필터"><option value="all">근무지 전체</option></select>
   <select id="revRange" title="매출액 범위 필터">
-    <option value="all">💰 매출액 전체</option>
+    <option value="all">매출액 전체</option>
     <option value="0-50">~50억</option>
     <option value="50-300">50~300억</option>
     <option value="300-1000">300~1000억</option>
@@ -92,8 +103,8 @@
     <option value="none">매출 미상</option>
   </select>
   <label style="color:var(--muted);font-size:13px;display:flex;align-items:center;gap:6px;cursor:pointer;"><input type="checkbox" id="hideClosed"> 마감 숨기기</label>
-  <button class="export" id="exportFav">찜 CSV 내보내기</button>
-  <button class="export" id="refresh" title="serve.py 실행 중일 때만 동작">🔄 갱신</button>
+  <button class="export" id="exportFav"><i data-lucide="download"></i> 찜 CSV 내보내기</button>
+  <button class="export" id="refresh" title="serve.py 실행 중일 때만 동작"><i data-lucide="refresh-cw"></i> <span id="refreshLabel">갱신</span></button>
 </div>
 
 <div class="wrap">
@@ -102,15 +113,15 @@
   <table id="tbl">
     <thead>
       <tr>
-        <th title="스크랩">⭐</th>
+        <th title="스크랩"><i data-lucide="star"></i></th>
         <th>회사</th>
         <th>직무 / 분류</th>
         <th>직무 세부 설명</th>
         <th>필수 · 우대 조건</th>
         <th>근무지</th>
-        <th data-k="deadline">마감일 <span class="sicon">⇅</span></th>
-        <th data-k="revenue">매출액 <span class="sicon">⇅</span></th>
-        <th data-k="employees">사원수/규모 <span class="sicon">⇅</span></th>
+        <th data-k="deadline">마감일 <span class="sicon"><i data-lucide="chevrons-up-down"></i></span></th>
+        <th data-k="revenue">매출액 <span class="sicon"><i data-lucide="chevrons-up-down"></i></span></th>
+        <th data-k="employees">사원수/규모 <span class="sicon"><i data-lucide="chevrons-up-down"></i></span></th>
         <th>지원</th>
       </tr>
     </thead>
@@ -119,6 +130,7 @@
   <div class="pager" id="pager"></div>
 </div>
 
+<script src="https://unpkg.com/lucide@latest"></script>
 <script>
 let DATA = [], COMPANIES = {}, filter = 'all', region = 'all', revRange = 'all', sortK = null, sortAsc = true, hideClosed = false;
 
@@ -226,7 +238,8 @@ function ddDays(raw){
 function updateSortIcon(){
   document.querySelectorAll('thead th[data-k]').forEach(th=>{
     const ic=th.querySelector('.sicon'); if(!ic) return;
-    ic.textContent = sortK===th.dataset.k ? (sortAsc?'↑':'↓') : '⇅';
+    const name = sortK===th.dataset.k ? (sortAsc?'chevron-up':'chevron-down') : 'chevrons-up-down';
+    ic.innerHTML = `<i data-lucide="${name}"></i>`;
   });
 }
 
@@ -266,11 +279,11 @@ function renderPager(total){
   const half=Math.floor(PAGE_WINDOW/2);
   let start=Math.max(1, page-half), end=Math.min(pages, start+PAGE_WINDOW-1);
   start=Math.max(1, end-PAGE_WINDOW+1);
-  let h=`<button ${page===1?'disabled':''} data-p="1" title="처음">«</button>`
-      + `<button ${page===1?'disabled':''} data-p="${page-1}" title="이전">‹</button>`;
+  let h=`<button ${page===1?'disabled':''} data-p="1" title="처음"><i data-lucide="chevrons-left"></i></button>`
+      + `<button ${page===1?'disabled':''} data-p="${page-1}" title="이전"><i data-lucide="chevron-left"></i></button>`;
   for(let i=start;i<=end;i++) h+=`<button class="${i===page?'cur':''}" data-p="${i}">${i}</button>`;
-  h+=`<button ${page===pages?'disabled':''} data-p="${page+1}" title="다음">›</button>`
-     + `<button ${page===pages?'disabled':''} data-p="${pages}" title="마지막">»</button>`;
+  h+=`<button ${page===pages?'disabled':''} data-p="${page+1}" title="다음"><i data-lucide="chevron-right"></i></button>`
+     + `<button ${page===pages?'disabled':''} data-p="${pages}" title="마지막"><i data-lucide="chevrons-right"></i></button>`;
   pager.innerHTML=h;
 }
 
@@ -289,8 +302,8 @@ function render(){
     return `<tr class="${closed?'closed':''}">
       <td>
         <div class="actions">
-          <button class="starbtn ${on?'on':''}" data-act="fav" data-k="${esc(k)}" title="스크랩">${on?'★':'☆'}</button>
-          <button class="hidebtn ${hidden?'restore':''}" data-act="hide" data-k="${esc(k)}" title="${hidden?'숨김 해제':'숨기기'}">${hidden?'↩︎ 복구':'✕ 숨김'}</button>
+          <button class="starbtn ${on?'on':''}" data-act="fav" data-k="${esc(k)}" title="스크랩"><i data-lucide="star"></i></button>
+          <button class="hidebtn ${hidden?'restore':''}" data-act="hide" data-k="${esc(k)}" title="${hidden?'숨김 해제':'숨기기'}">${hidden?'<i data-lucide="rotate-ccw"></i> 복구':'<i data-lucide="x"></i> 숨김'}</button>
         </div>
       </td>
       <td>${esc(d.company)}${closed?'<span class="badge-closed">마감</span>':''}<br>
@@ -308,6 +321,7 @@ function render(){
   countEl.textContent=`${from}–${to} / 총 ${list.length}건 (전체 ${DATA.length}건 · 찜 ${FAV.size}건 · 숨김 ${HIDE.size}건)`;
   renderPager(list.length);
   updateSortIcon();
+  if(window.lucide) lucide.createIcons();
 }
 
 function buildRegionOptions(){
@@ -315,7 +329,7 @@ function buildRegionOptions(){
   DATA.forEach(d=>{ const r=regionOf(d.location); counts[r]=(counts[r]||0)+1; });
   const order=[...SIDO,'전국','해외/기타','기타'].filter(r=>counts[r]);
   const sel=document.getElementById('region');
-  sel.innerHTML=`<option value="all">📍 근무지 전체 (${DATA.length})</option>`
+  sel.innerHTML=`<option value="all">근무지 전체 (${DATA.length})</option>`
     + order.map(r=>`<option value="${esc(r)}">${esc(r)} (${counts[r]})</option>`).join('');
 }
 
@@ -347,21 +361,21 @@ document.getElementById('exportFav').addEventListener('click', ()=>{
   const blob=new Blob(['﻿'+csv],{type:'text/csv;charset=utf-8'});
   const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download='찜한_공고.csv'; a.click();
 });
-// 🔄 갱신 버튼 — serve.py의 /scrape 호출 후 CSV 다시 로드
+// 갱신 버튼 — serve.py의 /scrape 호출 후 CSV 다시 로드 (아이콘은 두고 라벨만 변경)
 document.getElementById('refresh').addEventListener('click', async ()=>{
-  const btn=document.getElementById('refresh');
-  btn.disabled=true; btn.textContent='⏳ 스크래핑 중...';
+  const btn=document.getElementById('refresh'), lab=document.getElementById('refreshLabel');
+  btn.disabled=true; lab.textContent='스크래핑 중...';
   try{
     const r=await fetch('/scrape',{method:'POST'});
     const j=await r.json();
     if(!j.ok) throw new Error(j.log||'실패');
     await loadAll(true);
-    btn.textContent='✅ 갱신 완료';
+    lab.textContent='갱신 완료';
   }catch(e){
     errbox.innerHTML=`<div class="err">갱신 실패: ${esc(e.message)}<br>※ 이 버튼은 <code>python3 serve.py</code>로 띄웠을 때만 동작합니다.</div>`;
-    btn.textContent='🔄 갱신';
+    lab.textContent='갱신';
   }finally{
-    btn.disabled=false; setTimeout(()=>btn.textContent='🔄 갱신',2500);
+    btn.disabled=false; setTimeout(()=>{lab.textContent='갱신';},2500);
   }
 });
 // 페이지 네비게이터
@@ -409,6 +423,7 @@ async function loadAll(bust){
 loadAll(false).catch(()=>{
   errbox.innerHTML=`<div class="err">jobs.csv 자동 로드 실패 (file:// 제한). 위 <b>파일 선택</b>으로 불러오거나 <code>python3 serve.py</code>로 접속하세요.</div>`;
 });
+if(window.lucide) lucide.createIcons();  // 헤더·툴바 등 정적 아이콘 즉시 렌더
 </script>
 </body>
 </html>
