@@ -109,7 +109,6 @@
         <th>필수 · 우대 조건</th>
         <th>근무지</th>
         <th data-k="deadline">마감일 <span class="sicon">⇅</span></th>
-        <th>연봉</th>
         <th data-k="revenue">매출액 <span class="sicon">⇅</span></th>
         <th data-k="employees">사원수/규모 <span class="sicon">⇅</span></th>
         <th>지원</th>
@@ -301,7 +300,6 @@ function render(){
       <td class="req">${esc(d.requirements)||'—'}</td>
       <td class="small">${esc(d.location)||'—'}</td>
       <td class="dday ${dd.cls}">${esc(dd.txt)}</td>
-      <td class="pay">${esc(d.salary)||'미기재'}</td>
       <td class="small">${esc(rev)||'알 수 없음'}</td>
       <td class="small">${empCell}</td>
       <td>${d.url?`<a class="apply" href="${esc(d.url)}" target="_blank" rel="noopener">지원 →</a>`:'—'}</td>
@@ -341,7 +339,7 @@ rows.addEventListener('click', e=>{
 });
 // 찜 CSV 내보내기
 document.getElementById('exportFav').addEventListener('click', ()=>{
-  const cols=['company','role','category','description','requirements','location','deadline','salary','revenue','status','source','url'];
+  const cols=['company','role','category','description','requirements','location','deadline','revenue','status','source','url'];
   const favs=DATA.filter(d=>FAV.has(keyOf(d)));
   if(!favs.length){ alert('찜한 공고가 없습니다.'); return; }
   const valOf=(d,c)=> c==='revenue' ? ((COMPANIES[d.company_id]||{}).revenue||d.revenue||'') : d[c];
