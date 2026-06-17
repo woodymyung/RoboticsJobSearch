@@ -18,6 +18,8 @@
   .filters button.active{background:var(--accent);color:#fff;border-color:var(--accent);}
   .filters button[data-f="fav"].active{background:var(--star);color:#1a1a1a;border-color:var(--star);}
   .export{padding:8px 14px;border-radius:8px;border:1px solid var(--line);background:var(--chip);color:var(--text);cursor:pointer;font-size:13px;}
+  select#region{padding:8px 12px;border-radius:999px;border:1px solid var(--line);background:var(--chip);color:var(--text);font-size:13px;cursor:pointer;}
+  select#region.on{background:var(--accent);color:#fff;border-color:var(--accent);}
   .wrap{max-width:1340px;margin:0 auto;padding:0 20px 60px;overflow-x:auto;}
   table{width:100%;border-collapse:collapse;font-size:13.5px;background:var(--card);border-radius:12px;overflow:hidden;}
   thead th{position:sticky;top:0;background:#1d2230;color:var(--muted);text-align:left;padding:12px;font-weight:600;border-bottom:1px solid var(--line);white-space:nowrap;cursor:pointer;}
@@ -65,6 +67,7 @@
     <button data-f="영업">영업</button>
     <button data-f="fav">⭐ 찜</button>
   </div>
+  <select id="region" title="근무지(시/도) 필터"><option value="all">📍 근무지 전체</option></select>
   <button class="export" id="exportFav">찜 CSV 내보내기</button>
   <button class="export" id="refresh" title="serve.py 실행 중일 때만 동작">🔄 갱신</button>
 </div>
@@ -80,7 +83,7 @@
         <th data-k="role">직무 / 분류</th>
         <th data-k="description">직무 세부 설명</th>
         <th data-k="requirements">필수 · 우대 조건</th>
-        <th data-k="location">근무지</th>
+        <th>근무지</th>
         <th data-k="deadline">마감일</th>
         <th data-k="salary">연봉</th>
         <th data-k="revenue">매출액</th>
@@ -92,7 +95,18 @@
 </div>
 
 <script>
-let DATA = [], filter = 'all', sortK = null, sortAsc = true;
+let DATA = [], filter = 'all', region = 'all', sortK = null, sortAsc = true;
+
+// 시/도 표시 순서 (근무지 앞 2글자 코드)
+const SIDO = ['서울','경기','인천','부산','대구','광주','대전','울산','세종',
+              '강원','충북','충남','전북','전남','경북','경남','제주'];
+function regionOf(loc){
+  if(!loc) return '기타';
+  const p = loc.slice(0,2);
+  if(SIDO.includes(p)) return p;
+  if(loc.startsWith('전국')) return '전국';
+  return '해외/기타';  // 미국·일본 등
+}
 let FAV = new Set(JSON.parse(localStorage.getItem('fav_jobs') || '[]'));
 const rows = document.getElementById('rows');
 const q = document.getElementById('q');
@@ -141,8 +155,9 @@ function visible(){
   const term=q.value.trim().toLowerCase();
   let list=DATA.filter(d=>{
     const okF = filter==='all' ? true : filter==='fav' ? FAV.has(keyOf(d)) : d.category===filter;
+    const okR = region==='all' || regionOf(d.location)===region;
     const blob=Object.values(d).join(' ').toLowerCase();
-    return okF && (term===''||blob.includes(term));
+    return okF && okR && (term===''||blob.includes(term));
   });
   if(sortK) list=[...list].sort((a,b)=>(a[sortK]||'').localeCompare(b[sortK]||'','ko')*(sortAsc?1:-1));
   return list;
@@ -167,8 +182,17 @@ function render(){
   countEl.textContent=`총 ${list.length}건 표시 중 (전체 ${DATA.length}건 · 찜 ${FAV.size}건)`;
 }
 
+function buildRegionOptions(){
+  const counts={};
+  DATA.forEach(d=>{ const r=regionOf(d.location); counts[r]=(counts[r]||0)+1; });
+  const order=[...SIDO,'전국','해외/기타','기타'].filter(r=>counts[r]);
+  const sel=document.getElementById('region');
+  sel.innerHTML=`<option value="all">📍 근무지 전체 (${DATA.length})</option>`
+    + order.map(r=>`<option value="${esc(r)}">${esc(r)} (${counts[r]})</option>`).join('');
+}
+
 function load(text){
-  try{ DATA=parseCSV(text); errbox.innerHTML=''; render(); }
+  try{ DATA=parseCSV(text); errbox.innerHTML=''; buildRegionOptions(); render(); }
   catch(e){ errbox.innerHTML=`<div class="err">CSV 파싱 오류: ${esc(e.message)}</div>`; }
 }
 
@@ -212,6 +236,11 @@ document.querySelectorAll('thead th[data-k]').forEach(th=>th.addEventListener('c
   const k=th.dataset.k; if(sortK===k) sortAsc=!sortAsc; else {sortK=k;sortAsc=true;} render();
 }));
 q.addEventListener('input', render);
+document.getElementById('region').addEventListener('change', e=>{
+  region=e.target.value;
+  e.target.classList.toggle('on', region!=='all');
+  render();
+});
 document.querySelectorAll('#filters button').forEach(b=>b.addEventListener('click',()=>{
   document.querySelectorAll('#filters button').forEach(x=>x.classList.remove('active'));
   b.classList.add('active'); filter=b.dataset.f; render();
