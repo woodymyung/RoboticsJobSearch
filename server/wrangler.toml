@@ -1,0 +1,8 @@
+name = "robotics-job-userdata"
+main = "worker.js"
+compatibility_date = "2024-09-01"
+
+# KV 네임스페이스 — 아래 id는 `wrangler kv namespace create RJS` 실행 후 출력된 값으로 교체
+[[kv_namespaces]]
+binding = "RJS"
+id = "PUT_YOUR_KV_NAMESPACE_ID_HERE"

@@ -13,3 +13,6 @@ playwright-report/
 
 # DART API key (do not commit)
 scraper/.dart_key
+
+# 닉네임별 개인화 데이터(찜/숨김)
+userdata/

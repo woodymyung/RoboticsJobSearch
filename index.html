@@ -8,7 +8,12 @@
   :root{ --bg:#0f1116; --card:#171a21; --line:#262b36; --text:#e6e8ec; --muted:#9aa3b2; --accent:#4f8cff; --chip:#1f2735; --star:#ffcb45; }
   *{box-sizing:border-box;}
   body{margin:0;font-family:"Pretendard","Apple SD Gothic Neo","Malgun Gothic",system-ui,sans-serif;background:var(--bg);color:var(--text);line-height:1.5;}
-  header{padding:28px 20px 12px;max-width:1340px;margin:0 auto;}
+  header{padding:28px 20px 12px;max-width:1340px;margin:0 auto;position:relative;}
+  #userbar{position:absolute;top:20px;right:20px;display:flex;gap:6px;align-items:center;font-size:13px;}
+  #userbar input{padding:7px 10px;border-radius:8px;border:1px solid var(--line);background:var(--card);color:var(--text);font-size:13px;width:120px;}
+  #userbar button{padding:7px 11px;border-radius:8px;border:1px solid var(--line);background:var(--chip);color:var(--text);cursor:pointer;font-size:12.5px;}
+  #userbar button:hover{border-color:var(--accent);}
+  #userInfo{color:var(--accent);margin-right:4px;}
   h1{font-size:24px;margin:0 0 6px;}
   .sub{color:var(--muted);font-size:14px;}
   .toolbar{max-width:1340px;margin:14px auto;padding:0 20px;display:flex;gap:10px;flex-wrap:wrap;align-items:center;}
@@ -69,6 +74,12 @@
 </head>
 <body>
 <header>
+  <div id="userbar">
+    <span id="userInfo" style="display:none;"><i data-lucide="user"></i> <b id="userName"></b></span>
+    <input type="text" id="nickInput" placeholder="닉네임 입력" maxlength="32">
+    <button id="loginBtn"><i data-lucide="log-in"></i> 로그인</button>
+    <button id="logoutBtn" style="display:none;"><i data-lucide="log-out"></i> 로그아웃</button>
+  </div>
   <h1><i data-lucide="bot"></i> 로보틱스·자동화 신입 지원 가능 채용 리스트</h1>
   <div class="sub">데이터 소스: <code>jobs.csv</code> + <code>companies.csv</code> (ID 매칭) · 사람인 라이브 스크래핑</div>
 </header>
@@ -130,6 +141,12 @@
   <div class="pager" id="pager"></div>
 </div>
 
+<script>
+  // [개인화 서버] GitHub Pages 등 정적 호스팅에서 기기 간 동기화를 쓰려면
+  // 배포한 Cloudflare Worker 주소를 아래에 넣으세요 (server/README.md 참고).
+  // 비워두면 같은 출처(serve.py)를 사용합니다.
+  // window.RJS_API_BASE = 'https://robotics-job-userdata.<your>.workers.dev';
+</script>
 <script src="https://unpkg.com/lucide@latest"></script>
 <script>
 let DATA = [], COMPANIES = {}, filter = 'all', region = 'all', revRange = 'all', sortK = null, sortAsc = true, hideClosed = false;
@@ -176,8 +193,48 @@ function regionOf(loc){
   if(loc.startsWith('전국')) return '전국';
   return '해외/기타';  // 미국·일본 등
 }
-let FAV = new Set(JSON.parse(localStorage.getItem('fav_jobs') || '[]'));
-let HIDE = new Set(JSON.parse(localStorage.getItem('hidden_jobs') || '[]'));
+// 개인화 서버 주소: 비우면 같은 출처(serve.py). GitHub Pages 등에선 아래를 배포한 서버 URL로 설정.
+const API_BASE = (window.RJS_API_BASE || localStorage.getItem('rjs_api') || '').replace(/\/$/,'');
+let USER = localStorage.getItem('rjs_user') || '';
+function favKey(){ return USER ? 'fav_'+USER : 'fav_jobs'; }
+function hideKey(){ return USER ? 'hidden_'+USER : 'hidden_jobs'; }
+let FAV = new Set(JSON.parse(localStorage.getItem(favKey()) || '[]'));
+let HIDE = new Set(JSON.parse(localStorage.getItem(hideKey()) || '[]'));
+
+// 찜/숨김 저장: 로컬 캐시 + (로그인 시) 서버 동기화
+function saveState(){
+  localStorage.setItem(favKey(), JSON.stringify([...FAV]));
+  localStorage.setItem(hideKey(), JSON.stringify([...HIDE]));
+  if(USER){
+    fetch(API_BASE+'/userdata?user='+encodeURIComponent(USER), {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({fav:[...FAV], hidden:[...HIDE]})
+    }).catch(()=>{});  // 정적 호스팅(서버 없음)이면 로컬 캐시만 유지
+  }
+}
+// 닉네임 적용: 서버에서 내역 로드(실패 시 로컬 캐시 폴백) 후 렌더
+async function applyUser(user){
+  USER = user || '';
+  if(USER) localStorage.setItem('rjs_user', USER); else localStorage.removeItem('rjs_user');
+  FAV = new Set(JSON.parse(localStorage.getItem(favKey()) || '[]'));
+  HIDE = new Set(JSON.parse(localStorage.getItem(hideKey()) || '[]'));
+  if(USER){
+    try{
+      const d = await (await fetch(API_BASE+'/userdata?user='+encodeURIComponent(USER))).json();
+      FAV = new Set(d.fav || []); HIDE = new Set(d.hidden || []);
+      localStorage.setItem(favKey(), JSON.stringify([...FAV]));
+      localStorage.setItem(hideKey(), JSON.stringify([...HIDE]));
+    }catch(e){ /* 서버 없음: 로컬 캐시 사용 */ }
+  }
+  updateUserUI(); resetPage(); render();
+}
+function updateUserUI(){
+  const info=document.getElementById('userInfo'), nm=document.getElementById('userName');
+  const inp=document.getElementById('nickInput'), lin=document.getElementById('loginBtn'), lout=document.getElementById('logoutBtn');
+  if(USER){ info.style.display=''; nm.textContent=USER; inp.style.display='none'; lin.style.display='none'; lout.style.display=''; }
+  else{ info.style.display='none'; inp.style.display=''; lin.style.display=''; lout.style.display='none'; }
+  if(window.lucide) lucide.createIcons();
+}
 const rows = document.getElementById('rows');
 const q = document.getElementById('q');
 const countEl = document.getElementById('count');
@@ -344,13 +401,20 @@ rows.addEventListener('click', e=>{
   const k=b.dataset.k;
   if(b.dataset.act==='fav'){
     if(FAV.has(k)) FAV.delete(k); else FAV.add(k);
-    localStorage.setItem('fav_jobs', JSON.stringify([...FAV]));
   }else{
     if(HIDE.has(k)) HIDE.delete(k); else HIDE.add(k);
-    localStorage.setItem('hidden_jobs', JSON.stringify([...HIDE]));
   }
+  saveState();
   render();
 });
+// 로그인 / 로그아웃 (닉네임 기반 개인화)
+document.getElementById('loginBtn').addEventListener('click', ()=>{
+  const n=document.getElementById('nickInput').value.trim().replace(/[^0-9A-Za-z가-힣_\-]/g,'').slice(0,32);
+  if(!n){ alert('닉네임을 입력하세요.'); return; }
+  applyUser(n);
+});
+document.getElementById('nickInput').addEventListener('keydown', e=>{ if(e.key==='Enter') document.getElementById('loginBtn').click(); });
+document.getElementById('logoutBtn').addEventListener('click', ()=>applyUser(''));
 // 찜 CSV 내보내기
 document.getElementById('exportFav').addEventListener('click', ()=>{
   const cols=['company','role','category','description','requirements','location','deadline','revenue','status','source','url'];
@@ -420,9 +484,10 @@ async function loadAll(bust){
   const jobs=await (await fetch('jobs.csv'+qs)).text();
   load(jobs);  // load 내부에서 render
 }
-loadAll(false).catch(()=>{
+loadAll(false).then(()=>{ if(USER) applyUser(USER); }).catch(()=>{
   errbox.innerHTML=`<div class="err">jobs.csv 자동 로드 실패 (file:// 제한). 위 <b>파일 선택</b>으로 불러오거나 <code>python3 serve.py</code>로 접속하세요.</div>`;
 });
+updateUserUI();
 if(window.lucide) lucide.createIcons();  // 헤더·툴바 등 정적 아이콘 즉시 렌더
 </script>
 </body>
