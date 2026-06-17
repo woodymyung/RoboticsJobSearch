@@ -10,3 +10,6 @@ venv/
 # Playwright
 playwright-report/
 .cache/
+
+# DART API key (do not commit)
+scraper/.dart_key

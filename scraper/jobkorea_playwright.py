@@ -12,10 +12,7 @@
 """
 import urllib.parse
 
-from config import CATEGORY_QUERIES
-
-# 분류별 검색어를 평탄화 (검색어 -> 분류)
-KEYWORDS = [(q, cat) for cat, qs in CATEGORY_QUERIES.items() for q in qs]
+from config import COMMON_KEYWORDS, classify_str
 
 SEARCH = "https://www.jobkorea.co.kr/Search/?stext={kw}&careerType=1"  # careerType=1 신입
 
@@ -37,7 +34,7 @@ def fetch_jobkorea(max_pages: int = 2):
             locale="ko-KR",
         )
         page = ctx.new_page()
-        for kw in KEYWORDS:
+        for kw in COMMON_KEYWORDS:
             url = SEARCH.format(kw=urllib.parse.quote(kw))
             try:
                 page.goto(url, wait_until="domcontentloaded", timeout=20000)
@@ -62,18 +59,20 @@ def fetch_jobkorea(max_pages: int = 2):
                     seen.add(href)
                     comp_el = c.query_selector(".company-name, .name")
                     loc_el = c.query_selector(".chip-information-group .chip:nth-child(2), .option .loc")
+                    comp = (comp_el.inner_text().strip() if comp_el else "")
                     rows.append({
+                        "id": href,          # 잡코리아는 rec_idx 없음 → url을 id로
+                        "company_id": "",
                         "role": title,
-                        "category": classify(title),
-                        "company": (comp_el.inner_text().strip() if comp_el else ""),
+                        "category": classify_str(title),
+                        "company": comp,
                         "description": "",
                         "requirements": "신입",
                         "location": (loc_el.inner_text().strip() if loc_el else ""),
+                        "deadline": "",
                         "salary": "",
-                        "revenue": "",
                         "source": "잡코리아",
                         "url": href,
-                        "deadline": "",
                     })
                 except Exception:
                     continue

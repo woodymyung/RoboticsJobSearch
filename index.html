@@ -17,17 +17,20 @@
   .filters button{padding:8px 14px;border-radius:999px;border:1px solid var(--line);background:var(--chip);color:var(--muted);cursor:pointer;font-size:13px;}
   .filters button.active{background:var(--accent);color:#fff;border-color:var(--accent);}
   .filters button[data-f="fav"].active{background:var(--star);color:#1a1a1a;border-color:var(--star);}
+  .filters button[data-f="hidden"].active{background:#6b2525;color:#fff;border-color:#8a3030;}
   .export{padding:8px 14px;border-radius:8px;border:1px solid var(--line);background:var(--chip);color:var(--text);cursor:pointer;font-size:13px;}
-  select#region{padding:8px 12px;border-radius:999px;border:1px solid var(--line);background:var(--chip);color:var(--text);font-size:13px;cursor:pointer;}
-  select#region.on{background:var(--accent);color:#fff;border-color:var(--accent);}
+  select#region,select#revRange{padding:8px 12px;border-radius:999px;border:1px solid var(--line);background:var(--chip);color:var(--text);font-size:13px;cursor:pointer;}
+  select#region.on,select#revRange.on{background:var(--accent);color:#fff;border-color:var(--accent);}
   .wrap{max-width:1340px;margin:0 auto;padding:0 20px 60px;overflow-x:auto;}
   table{width:100%;border-collapse:collapse;font-size:13.5px;background:var(--card);border-radius:12px;overflow:hidden;}
-  thead th{position:sticky;top:0;background:#1d2230;color:var(--muted);text-align:left;padding:12px;font-weight:600;border-bottom:1px solid var(--line);white-space:nowrap;cursor:pointer;}
-  thead th:hover{color:var(--text);}
+  thead th{position:sticky;top:0;background:#1d2230;color:var(--muted);text-align:left;padding:12px;font-weight:600;border-bottom:1px solid var(--line);white-space:nowrap;cursor:default;}
+  thead th[data-k]{cursor:pointer;}
+  thead th[data-k]:hover{color:var(--text);}
+  .sicon{font-size:12px;color:var(--accent);}
   tbody td{padding:12px;border-bottom:1px solid var(--line);vertical-align:top;}
   tbody tr:hover{background:#1b2030;}
   .role{font-weight:700;color:#fff;}
-  .cat{display:inline-block;margin-top:4px;font-size:11px;padding:2px 8px;border-radius:6px;background:var(--chip);color:var(--accent);}
+  .cat{display:inline-block;margin:4px 4px 0 0;font-size:11px;padding:2px 8px;border-radius:6px;background:var(--chip);color:var(--accent);}
   .small{color:var(--muted);font-size:12px;}
   .req{color:var(--muted);font-size:12.5px;}
   .pay{color:#5fd08a;font-weight:600;white-space:nowrap;}
@@ -35,18 +38,29 @@
   .dday.soon{color:#ff7a7a;} .dday.normal{color:#e6e8ec;} .dday.none{color:var(--muted);font-weight:400;}
   a.apply{display:inline-block;padding:7px 12px;border-radius:8px;background:var(--accent);color:#fff;text-decoration:none;font-size:12.5px;white-space:nowrap;}
   a.apply:hover{opacity:.88;}
-  .starbtn{font-size:18px;cursor:pointer;background:none;border:none;color:#3a4150;line-height:1;}
+  .actions{display:flex;flex-direction:row;align-items:center;gap:8px;white-space:nowrap;}
+  .starbtn{font-size:18px;cursor:pointer;background:none;border:none;color:#3a4150;line-height:1;padding:0;}
   .starbtn.on{color:var(--star);}
+  .hidebtn{font-size:11.5px;cursor:pointer;background:none;border:1px solid var(--line);border-radius:6px;padding:3px 7px;color:#8a93a3;line-height:1.3;}
+  .hidebtn:hover{color:#ff7a7a;border-color:#6b2525;}
+  .hidebtn.restore{color:#5fd08a;border-color:#2f5f43;}
+  .badge-closed{display:inline-block;font-size:10px;padding:1px 6px;border-radius:5px;background:#3a1c1c;color:#ff9a9a;margin-left:6px;}
+  tr.closed{opacity:.5;}
   .note{max-width:1340px;margin:8px auto 0;padding:14px 20px;color:var(--muted);font-size:12.5px;background:#14304a33;border:1px solid #25496b;border-radius:10px;}
   .count{color:var(--muted);font-size:13px;margin:6px 0 12px;}
   .err{color:#ffb4b4;background:#3a1c1c;border:1px solid #6b2525;padding:14px;border-radius:10px;margin:16px 0;}
   .src{font-size:11px;color:var(--muted);}
+  .pager{display:flex;gap:6px;justify-content:center;flex-wrap:wrap;margin:22px 0 10px;}
+  .pager button{min-width:34px;padding:7px 10px;border-radius:8px;border:1px solid var(--line);background:var(--card);color:var(--text);cursor:pointer;font-size:13px;}
+  .pager button:hover:not(:disabled){border-color:var(--accent);}
+  .pager button.cur{background:var(--accent);color:#fff;border-color:var(--accent);font-weight:700;}
+  .pager button:disabled{opacity:.35;cursor:default;}
 </style>
 </head>
 <body>
 <header>
   <h1>🤖 로보틱스·자동화 신입 지원 가능 채용 리스트</h1>
-  <div class="sub">데이터 소스: <code>jobs.csv</code> · 사람인 라이브 스크래핑 (scraper/build_csv.py)</div>
+  <div class="sub">데이터 소스: <code>jobs.csv</code> + <code>companies.csv</code> (ID 매칭) · 사람인 라이브 스크래핑</div>
 </header>
 
 <div class="note">
@@ -60,14 +74,24 @@
   <input type="search" id="q" placeholder="🔍 회사·직무·근무지·조건·출처 검색">
   <div class="filters" id="filters">
     <button class="active" data-f="all">전체</button>
-    <button data-f="기획/매니징">기획/매니징</button>
+    <button data-f="기획/PM">기획/PM</button>
     <button data-f="R&D">R&D</button>
-    <button data-f="필드 엔지니어">필드 엔지니어</button>
-    <button data-f="제조">제조</button>
+    <button data-f="필드엔지니어">필드엔지니어</button>
+    <button data-f="생산/제조">생산/제조</button>
     <button data-f="영업">영업</button>
     <button data-f="fav">⭐ 찜</button>
+    <button data-f="hidden">🚫 숨김</button>
   </div>
   <select id="region" title="근무지(시/도) 필터"><option value="all">📍 근무지 전체</option></select>
+  <select id="revRange" title="매출액 범위 필터">
+    <option value="all">💰 매출액 전체</option>
+    <option value="0-50">~50억</option>
+    <option value="50-300">50~300억</option>
+    <option value="300-1000">300~1000억</option>
+    <option value="1000-">1000억 이상</option>
+    <option value="none">매출 미상</option>
+  </select>
+  <label style="color:var(--muted);font-size:13px;display:flex;align-items:center;gap:6px;cursor:pointer;"><input type="checkbox" id="hideClosed"> 마감 숨기기</label>
   <button class="export" id="exportFav">찜 CSV 내보내기</button>
   <button class="export" id="refresh" title="serve.py 실행 중일 때만 동작">🔄 갱신</button>
 </div>
@@ -79,23 +103,57 @@
     <thead>
       <tr>
         <th title="스크랩">⭐</th>
-        <th data-k="company">회사</th>
-        <th data-k="role">직무 / 분류</th>
-        <th data-k="description">직무 세부 설명</th>
-        <th data-k="requirements">필수 · 우대 조건</th>
+        <th>회사</th>
+        <th>직무 / 분류</th>
+        <th>직무 세부 설명</th>
+        <th>필수 · 우대 조건</th>
         <th>근무지</th>
-        <th data-k="deadline">마감일</th>
-        <th data-k="salary">연봉</th>
-        <th data-k="revenue">매출액</th>
+        <th data-k="deadline">마감일 <span class="sicon">⇅</span></th>
+        <th>연봉</th>
+        <th data-k="revenue">매출액 <span class="sicon">⇅</span></th>
+        <th data-k="employees">사원수/규모 <span class="sicon">⇅</span></th>
         <th>지원</th>
       </tr>
     </thead>
     <tbody id="rows"></tbody>
   </table>
+  <div class="pager" id="pager"></div>
 </div>
 
 <script>
-let DATA = [], filter = 'all', region = 'all', sortK = null, sortAsc = true;
+let DATA = [], COMPANIES = {}, filter = 'all', region = 'all', revRange = 'all', sortK = null, sortAsc = true, hideClosed = false;
+
+// 매출액 문자열("273억 1백만원(2025.12.31)") -> 억 단위 숫자. 없으면 null.
+function revNum(d){
+  const s=(COMPANIES[d.company_id]||{}).revenue||d.revenue||'';
+  if(!s) return null;
+  let eok=0; const jo=s.match(/([\d,.]+)\s*조/), e=s.match(/([\d,.]+)\s*억/);
+  if(jo) eok+=parseFloat(jo[1].replace(/,/g,''))*10000;
+  if(e)  eok+=parseFloat(e[1].replace(/,/g,''));
+  if(!jo&&!e){ const m=s.match(/([\d,.]+)\s*만/); if(m) eok=parseFloat(m[1].replace(/,/g,''))/10000; }
+  return eok||null;
+}
+// 사원수("247명") -> 숫자. 없으면 null.
+function empNum(d){
+  const m=((COMPANIES[d.company_id]||{}).employees||'').match(/([\d,]+)\s*명/);
+  return m?parseInt(m[1].replace(/,/g,'')):null;
+}
+// 매출액 범위 필터 (억 단위)
+function revInRange(d){
+  if(revRange==='all') return true;
+  const v=revNum(d);
+  if(revRange==='none') return v==null;
+  if(v==null) return false;
+  const [lo,hi]=revRange.split('-');
+  if(lo!=='' && v<+lo) return false;
+  if(hi!=='' && v>=+hi) return false;
+  return true;
+}
+let page = 1;                 // 현재 페이지(1-based)
+const PAGE_SIZE = 20;         // 페이지당 공고 수
+const PAGE_WINDOW = 10;       // 페이지 네비게이터에 한 번에 보이는 번호 수
+function goPage(p){ page = p; render(); window.scrollTo({top:0,behavior:'smooth'}); }
+function resetPage(){ page = 1; }
 
 // 시/도 표시 순서 (근무지 앞 2글자 코드)
 const SIDO = ['서울','경기','인천','부산','대구','광주','대전','울산','세종',
@@ -108,6 +166,7 @@ function regionOf(loc){
   return '해외/기타';  // 미국·일본 등
 }
 let FAV = new Set(JSON.parse(localStorage.getItem('fav_jobs') || '[]'));
+let HIDE = new Set(JSON.parse(localStorage.getItem('hidden_jobs') || '[]'));
 const rows = document.getElementById('rows');
 const q = document.getElementById('q');
 const countEl = document.getElementById('count');
@@ -151,35 +210,106 @@ function ddInfo(raw){
   return {txt:raw, cls:'normal'};
 }
 
+// 마감일 -> 남은 일수(숫자). 미정/상시는 맨 뒤로 가도록 큰 값.
+function ddDays(raw){
+  if(!raw) return 1e9;
+  if(/오늘/.test(raw)) return 0;
+  if(/내일/.test(raw)) return 1;
+  const m=raw.match(/(\d{1,2})\/(\d{1,2})/);
+  if(m){
+    const now=new Date(), mo=+m[1]-1, da=+m[2];
+    let due=new Date(now.getFullYear(),mo,da);
+    if(due<now-864e5) due=new Date(now.getFullYear()+1,mo,da);
+    return Math.ceil((due-now)/864e5);
+  }
+  return 1e9;
+}
+function updateSortIcon(){
+  document.querySelectorAll('thead th[data-k]').forEach(th=>{
+    const ic=th.querySelector('.sicon'); if(!ic) return;
+    ic.textContent = sortK===th.dataset.k ? (sortAsc?'↑':'↓') : '⇅';
+  });
+}
+
 function visible(){
   const term=q.value.trim().toLowerCase();
   let list=DATA.filter(d=>{
-    const okF = filter==='all' ? true : filter==='fav' ? FAV.has(keyOf(d)) : d.category===filter;
+    const k=keyOf(d), hidden=HIDE.has(k);
+    // 숨김 모아보기일 때만 숨긴 항목 노출, 그 외에는 숨긴 항목 제외
+    if(filter==='hidden') { if(!hidden) return false; }
+    else if(hidden) return false;
+    if(hideClosed && d.status==='마감' && filter!=='fav') return false;
+    const cats=(d.category||'').split('|').filter(Boolean);
+    const okF = (filter==='all'||filter==='hidden') ? true : filter==='fav' ? FAV.has(k) : cats.includes(filter);
     const okR = region==='all' || regionOf(d.location)===region;
+    const okRev = revInRange(d);
     const blob=Object.values(d).join(' ').toLowerCase();
-    return okF && okR && (term===''||blob.includes(term));
+    return okF && okR && okRev && (term===''||blob.includes(term));
   });
-  if(sortK) list=[...list].sort((a,b)=>(a[sortK]||'').localeCompare(b[sortK]||'','ko')*(sortAsc?1:-1));
+  const keyFns={deadline:d=>ddDays(d.deadline), revenue:revNum, employees:empNum};
+  if(sortK && keyFns[sortK]){
+    const f=keyFns[sortK];
+    list=[...list].sort((a,b)=>{
+      let va=f(a), vb=f(b);
+      const na=(va==null), nb=(vb==null);
+      if(na&&nb) return 0; if(na) return 1; if(nb) return -1;  // 값 없으면 항상 뒤로
+      return (va-vb)*(sortAsc?1:-1);
+    });
+  }
   return list;
+}
+
+function renderPager(total){
+  const pager=document.getElementById('pager');
+  const pages=Math.max(1, Math.ceil(total/PAGE_SIZE));
+  if(page>pages) page=pages;
+  if(pages<=1){ pager.innerHTML=''; return; }
+  const half=Math.floor(PAGE_WINDOW/2);
+  let start=Math.max(1, page-half), end=Math.min(pages, start+PAGE_WINDOW-1);
+  start=Math.max(1, end-PAGE_WINDOW+1);
+  let h=`<button ${page===1?'disabled':''} data-p="1" title="처음">«</button>`
+      + `<button ${page===1?'disabled':''} data-p="${page-1}" title="이전">‹</button>`;
+  for(let i=start;i<=end;i++) h+=`<button class="${i===page?'cur':''}" data-p="${i}">${i}</button>`;
+  h+=`<button ${page===pages?'disabled':''} data-p="${page+1}" title="다음">›</button>`
+     + `<button ${page===pages?'disabled':''} data-p="${pages}" title="마지막">»</button>`;
+  pager.innerHTML=h;
 }
 
 function render(){
   const list=visible();
-  rows.innerHTML=list.map(d=>{
-    const k=keyOf(d), on=FAV.has(k), dd=ddInfo(d.deadline);
-    return `<tr>
-      <td><button class="starbtn ${on?'on':''}" data-k="${esc(k)}" title="스크랩">${on?'★':'☆'}</button></td>
-      <td>${esc(d.company)}<br><span class="src">${esc(d.source)}</span></td>
-      <td><span class="role">${esc(d.role)}</span><br><span class="cat">${esc(d.category)}</span></td>
+  const startIdx=(page-1)*PAGE_SIZE;
+  const pageList=list.slice(startIdx, startIdx+PAGE_SIZE);
+  rows.innerHTML=pageList.map(d=>{
+    const k=keyOf(d), on=FAV.has(k), hidden=HIDE.has(k), dd=ddInfo(d.deadline);
+    const closed = d.status==='마감';
+    const co = COMPANIES[d.company_id] || {};
+    const rev = co.revenue || d.revenue || '';
+    const emp = co.employees || '', scale = co.biz_type || '';
+    const empCell = emp ? (esc(emp)+(scale?'<br><span class="src">'+esc(scale)+'</span>':''))
+                        : (scale ? esc(scale) : '알 수 없음');
+    return `<tr class="${closed?'closed':''}">
+      <td>
+        <div class="actions">
+          <button class="starbtn ${on?'on':''}" data-act="fav" data-k="${esc(k)}" title="스크랩">${on?'★':'☆'}</button>
+          <button class="hidebtn ${hidden?'restore':''}" data-act="hide" data-k="${esc(k)}" title="${hidden?'숨김 해제':'숨기기'}">${hidden?'↩︎ 복구':'✕ 숨김'}</button>
+        </div>
+      </td>
+      <td>${esc(d.company)}${closed?'<span class="badge-closed">마감</span>':''}<br>
+          <span class="src">${co.industry?esc(co.industry)+' · ':''}${esc(d.source)}</span></td>
+      <td><span class="role">${esc(d.role)}</span><br>${(d.category||'').split('|').filter(Boolean).map(c=>`<span class="cat">${esc(c)}</span>`).join(' ')}</td>
       <td class="small">${esc(d.description)||'—'}</td>
       <td class="req">${esc(d.requirements)||'—'}</td>
       <td class="small">${esc(d.location)||'—'}</td>
       <td class="dday ${dd.cls}">${esc(dd.txt)}</td>
       <td class="pay">${esc(d.salary)||'미기재'}</td>
-      <td class="small">${esc(d.revenue)||'확인필요'}</td>
+      <td class="small">${esc(rev)||'알 수 없음'}</td>
+      <td class="small">${empCell}</td>
       <td>${d.url?`<a class="apply" href="${esc(d.url)}" target="_blank" rel="noopener">지원 →</a>`:'—'}</td>
     </tr>`;}).join('');
-  countEl.textContent=`총 ${list.length}건 표시 중 (전체 ${DATA.length}건 · 찜 ${FAV.size}건)`;
+  const from=list.length?startIdx+1:0, to=Math.min(startIdx+PAGE_SIZE, list.length);
+  countEl.textContent=`${from}–${to} / 총 ${list.length}건 (전체 ${DATA.length}건 · 찜 ${FAV.size}건 · 숨김 ${HIDE.size}건)`;
+  renderPager(list.length);
+  updateSortIcon();
 }
 
 function buildRegionOptions(){
@@ -192,24 +322,30 @@ function buildRegionOptions(){
 }
 
 function load(text){
-  try{ DATA=parseCSV(text); errbox.innerHTML=''; buildRegionOptions(); render(); }
+  try{ DATA=parseCSV(text); errbox.innerHTML=''; resetPage(); buildRegionOptions(); render(); }
   catch(e){ errbox.innerHTML=`<div class="err">CSV 파싱 오류: ${esc(e.message)}</div>`; }
 }
 
-// 별 토글 (이벤트 위임)
+// 별/숨김 토글 (이벤트 위임)
 rows.addEventListener('click', e=>{
-  const b=e.target.closest('.starbtn'); if(!b) return;
+  const b=e.target.closest('.starbtn,.hidebtn'); if(!b) return;
   const k=b.dataset.k;
-  if(FAV.has(k)) FAV.delete(k); else FAV.add(k);
-  localStorage.setItem('fav_jobs', JSON.stringify([...FAV]));
+  if(b.dataset.act==='fav'){
+    if(FAV.has(k)) FAV.delete(k); else FAV.add(k);
+    localStorage.setItem('fav_jobs', JSON.stringify([...FAV]));
+  }else{
+    if(HIDE.has(k)) HIDE.delete(k); else HIDE.add(k);
+    localStorage.setItem('hidden_jobs', JSON.stringify([...HIDE]));
+  }
   render();
 });
 // 찜 CSV 내보내기
 document.getElementById('exportFav').addEventListener('click', ()=>{
-  const cols=['company','role','category','description','requirements','location','deadline','salary','revenue','source','url'];
+  const cols=['company','role','category','description','requirements','location','deadline','salary','revenue','status','source','url'];
   const favs=DATA.filter(d=>FAV.has(keyOf(d)));
   if(!favs.length){ alert('찜한 공고가 없습니다.'); return; }
-  const csv=[cols.join(',')].concat(favs.map(d=>cols.map(c=>csvCell(d[c])).join(','))).join('\n');
+  const valOf=(d,c)=> c==='revenue' ? ((COMPANIES[d.company_id]||{}).revenue||d.revenue||'') : d[c];
+  const csv=[cols.join(',')].concat(favs.map(d=>cols.map(c=>csvCell(valOf(d,c))).join(','))).join('\n');
   const blob=new Blob(['﻿'+csv],{type:'text/csv;charset=utf-8'});
   const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download='찜한_공고.csv'; a.click();
 });
@@ -221,8 +357,7 @@ document.getElementById('refresh').addEventListener('click', async ()=>{
     const r=await fetch('/scrape',{method:'POST'});
     const j=await r.json();
     if(!j.ok) throw new Error(j.log||'실패');
-    const text=await (await fetch('jobs.csv?'+Date.now())).text();
-    load(text);
+    await loadAll(true);
     btn.textContent='✅ 갱신 완료';
   }catch(e){
     errbox.innerHTML=`<div class="err">갱신 실패: ${esc(e.message)}<br>※ 이 버튼은 <code>python3 serve.py</code>로 띄웠을 때만 동작합니다.</div>`;
@@ -231,27 +366,51 @@ document.getElementById('refresh').addEventListener('click', async ()=>{
     btn.disabled=false; setTimeout(()=>btn.textContent='🔄 갱신',2500);
   }
 });
-// 정렬 / 검색 / 필터
+// 페이지 네비게이터
+document.getElementById('pager').addEventListener('click', e=>{
+  const b=e.target.closest('button[data-p]'); if(!b||b.disabled) return;
+  goPage(+b.dataset.p);
+});
+// 정렬 / 검색 / 필터 (변경 시 1페이지로)
 document.querySelectorAll('thead th[data-k]').forEach(th=>th.addEventListener('click',()=>{
-  const k=th.dataset.k; if(sortK===k) sortAsc=!sortAsc; else {sortK=k;sortAsc=true;} render();
+  const k=th.dataset.k; if(sortK===k) sortAsc=!sortAsc; else {sortK=k;sortAsc=true;} resetPage(); render();
 }));
-q.addEventListener('input', render);
+q.addEventListener('input', ()=>{ resetPage(); render(); });
+document.getElementById('hideClosed').addEventListener('change', e=>{ hideClosed=e.target.checked; resetPage(); render(); });
 document.getElementById('region').addEventListener('change', e=>{
   region=e.target.value;
   e.target.classList.toggle('on', region!=='all');
-  render();
+  resetPage(); render();
+});
+document.getElementById('revRange').addEventListener('change', e=>{
+  revRange=e.target.value;
+  e.target.classList.toggle('on', revRange!=='all');
+  resetPage(); render();
 });
 document.querySelectorAll('#filters button').forEach(b=>b.addEventListener('click',()=>{
   document.querySelectorAll('#filters button').forEach(x=>x.classList.remove('active'));
-  b.classList.add('active'); filter=b.dataset.f; render();
+  b.classList.add('active'); filter=b.dataset.f; resetPage(); render();
 }));
 document.getElementById('file').addEventListener('change', e=>{
   const f=e.target.files[0]; if(!f) return;
   const r=new FileReader(); r.onload=()=>load(r.result); r.readAsText(f,'utf-8');
 });
 
-fetch('jobs.csv').then(r=>{if(!r.ok)throw new Error('HTTP '+r.status);return r.text();}).then(load)
-  .catch(()=>{ errbox.innerHTML=`<div class="err">jobs.csv 자동 로드 실패 (file:// 제한). 위 <b>파일 선택</b>으로 불러오거나 <code>python3 -m http.server</code>로 접속하세요.</div>`; });
+// companies.csv -> COMPANIES 맵 (id 기준). 매출액 등 회사정보 매칭용.
+function loadCompanies(text){
+  COMPANIES={};
+  try{ parseCSV(text).forEach(c=>{ if(c.id) COMPANIES[c.id]=c; }); }catch(e){}
+}
+async function loadAll(bust){
+  const qs = bust?('?'+Date.now()):'';
+  // 회사정보 먼저(있으면) → 직무 로드 시 join에 사용
+  try{ loadCompanies(await (await fetch('companies.csv'+qs)).text()); }catch(e){}
+  const jobs=await (await fetch('jobs.csv'+qs)).text();
+  load(jobs);  // load 내부에서 render
+}
+loadAll(false).catch(()=>{
+  errbox.innerHTML=`<div class="err">jobs.csv 자동 로드 실패 (file:// 제한). 위 <b>파일 선택</b>으로 불러오거나 <code>python3 serve.py</code>로 접속하세요.</div>`;
+});
 </script>
 </body>
 </html>

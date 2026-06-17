@@ -10,55 +10,93 @@
 """
 import os
 import io
+import re
 import zipfile
+import threading
 import xml.etree.ElementTree as ET
 import requests
 
 CORP_CODE_URL = "https://opendart.fss.or.kr/api/corpCode.xml"
 FIN_URL = "https://opendart.fss.or.kr/api/fnlttSinglAcnt.json"
 
-_corp_map = None
+_corp_index = None  # 정규화된 회사명 -> [corp_code, ...]
+_index_lock = threading.Lock()  # 병렬 시 corpCode.xml 1회만 로드
 
 
-def _load_corp_map(key):
-    global _corp_map
-    if _corp_map is not None:
-        return _corp_map
+def _norm(name: str) -> str:
+    """동일성 비교용: 주식회사/(주)/㈜/괄호/공백 제거 + 소문자."""
+    n = re.sub(r"주식회사|㈜|\((?:주|유|사|재|합|학|의)\)|\(.*?\)", "", name or "")
+    return re.sub(r"\s+", "", n).lower()
+
+
+def _load_corp_index(key):
+    global _corp_index
+    if _corp_index is not None:
+        return _corp_index
+    with _index_lock:
+        if _corp_index is not None:   # 락 대기 중 다른 스레드가 로드했을 수 있음
+            return _corp_index
+        return _build_corp_index(key)
+
+
+def _build_corp_index(key):
+    global _corp_index
     r = requests.get(CORP_CODE_URL, params={"crtfc_key": key}, timeout=30)
     z = zipfile.ZipFile(io.BytesIO(r.content))
     root = ET.fromstring(z.read(z.namelist()[0]))
-    _corp_map = {}
+    _corp_index = {}
     for el in root.iter("list"):
         name = (el.findtext("corp_name") or "").strip()
         code = (el.findtext("corp_code") or "").strip()
-        if name:
-            _corp_map[name] = code
-    return _corp_map
+        if name and code:
+            _corp_index.setdefault(_norm(name), []).append(code)
+    return _corp_index
 
 
-def revenue_for(company: str, year: str = "2024") -> str:
+def _fmt(won: int, year: str) -> str:
+    eok = won / 1e8
+    if eok >= 10000:
+        return f"{eok/10000:,.1f}조원({year})"
+    return f"{eok:,.0f}억원({year})"
+
+
+def _api_key():
+    """DART 키: 환경변수 우선, 없으면 scraper/.dart_key 파일(gitignore됨)."""
     key = os.environ.get("DART_API_KEY")
+    if key:
+        return key.strip()
+    try:
+        p = os.path.join(os.path.dirname(__file__), ".dart_key")
+        with open(p, encoding="utf-8") as f:
+            return f.read().strip()
+    except Exception:
+        return ""
+
+
+def revenue_for(company: str, years=("2024", "2023", "2022")) -> str:
+    """DART에서 매출액 조회. 회사명 100% 일치(정규화) + 단일 매칭일 때만 반환.
+    동명 회사가 둘 이상이면(모호) 빈 문자열."""
+    key = _api_key()
     if not key or not company:
         return ""
     try:
-        corp_map = _load_corp_map(key)
-        code = corp_map.get(company)
-        if not code:  # 부분 일치 시도
-            for n, c in corp_map.items():
-                if company in n or n in company:
-                    code = c
-                    break
-        if not code:
+        idx = _load_corp_index(key)
+        codes = idx.get(_norm(company), [])
+        if len(codes) != 1:        # 미존재 or 동명 모호 → 안전하게 미상
             return ""
-        r = requests.get(FIN_URL, params={
-            "crtfc_key": key, "corp_code": code,
-            "bsns_year": year, "reprt_code": "11011",  # 사업보고서
-        }, timeout=15).json()
-        for item in r.get("list", []):
-            if item.get("account_nm") == "매출액":
-                amt = item.get("thstrm_amount", "").replace(",", "")
-                if amt.isdigit():
-                    return f"{int(amt)/1e8:,.0f}억원({year})"
+        code = codes[0]
+        for year in years:
+            r = requests.get(FIN_URL, params={
+                "crtfc_key": key, "corp_code": code,
+                "bsns_year": year, "reprt_code": "11011",  # 사업보고서
+            }, timeout=15).json()
+            if r.get("status") != "000":
+                continue
+            for item in r.get("list", []):
+                if item.get("account_nm") == "매출액" and item.get("fs_div") in (None, "CFS", "OFS"):
+                    amt = (item.get("thstrm_amount") or "").replace(",", "")
+                    if amt.lstrip("-").isdigit():
+                        return _fmt(int(amt), year)
     except Exception:
         return ""
     return ""

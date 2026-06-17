@@ -1,76 +1,118 @@
-"""공통 설정: 분류별 검색 키워드, 출력 경로.
+"""공통 설정: 검색 키워드, 사이트 우선순위, 직무 분류, 출력 경로.
 
-== 분류 우선순위 ==
-아래 CATEGORY_QUERIES의 '딕셔너리 정의 순서'가 곧 우선순위다.
-한 공고가 여러 분류 검색에 동시에 잡히면, 위에 정의된 분류로 확정한다
-(build_csv.py가 위에서부터 수집하며 중복 제거 시 먼저 잡힌 분류를 유지).
-따라서 더 좁고 명확한 분류를 위에 둘수록 정확해진다.
-
-== 키워드 편집 방법 ==
-각 분류의 리스트에 사람인 검색창에 넣을 검색어를 넣으면 된다.
-검색어는 공백으로 AND 검색됨 (예: "로봇 기획" = 로봇 AND 기획).
+== 수집 로직 ==
+1) COMMON_KEYWORDS 로 여러 사이트(SITE_PRIORITY 순서)를 검색해 공고를 모은다.
+2) 사이트 간 중복은 (회사명+직무명) 기준으로 제거하되, 우선순위 높은 사이트를 남긴다.
+3) 각 공고 제목/직무분야를 classify()로 5개 직무로 분류한다.
 """
 from pathlib import Path
 
 # 신입 지원 가능 공고만: 사람인 exp_cd 1=신입
 SARAMIN_EXP_CODES = ["1"]
 
-# ▼ 분류별 검색 키워드 (정의 순서 = 우선순위) — 자유롭게 추가/삭제하세요
-CATEGORY_QUERIES = {
-    "영업": [
-        "로봇 영업", "자동화 기술영업", "로보틱스 세일즈", "로봇 B2B영업",
-    ],
-    "기획/매니징": [
-        "로봇 기획", "로보틱스 상품기획", "자동화 사업개발", "로봇 프로젝트 매니저",
-        "로봇 전략기획", "스마트팩토리 기획",
-    ],
-    "필드 엔지니어": [
-        "로봇 시운전", "로봇 설치", "자동화 유지보수", "로봇 필드엔지니어",
-        "로봇 티칭", "자동화설비 셋업", "로봇 서비스엔지니어",
-    ],
-    "제조": [
-        "로봇 생산", "자동화설비 조립", "로봇 품질관리", "자동화 공정",
-        "로봇 제조", "스마트팩토리 생산",
-    ],
-    "R&D": [
-        "로봇 연구", "로보틱스 개발", "로봇 제어 알고리즘", "자율주행 소프트웨어",
-        "머신비전 개발", "협동로봇 설계", "로봇 SW 엔지니어", "휴머노이드 연구",
-    ],
-}
-
-# CSV 출력 경로 (HTML이 같은 폴더 상위에서 읽음)
-OUT_CSV = Path(__file__).resolve().parent.parent / "jobs.csv"
-
-# CSV 컬럼 순서 (구조적: 회사 → 직무 → 조건 → 근무/시점 → 보상 → 출처)
-COLUMNS = [
-    "company",      # 1. 회사명
-    "role",         # 2. 직무명
-    "category",     # 3. 분류
-    "description",  # 4. 직무 세부 설명
-    "requirements", # 5. 필수·우대 조건
-    "location",     # 6. 근무지
-    "deadline",     # 7. 마감일
-    "salary",       # 8. 연봉 (없으면 빈칸)
-    "revenue",      # 9. 매출액 (DART enrich, 없으면 빈칸)
-    "source",       # 10. 출처 사이트
-    "url",          # 11. 지원 링크
+# ▼ 공통 검색 키워드 — 모든 사이트에 동일하게 사용
+#   핵심 8개 + 광역 키워드(스마트팩토리/자율주행/자동화설비)로 누락 방지.
+#   ('자동화' 검색만으론 스마트팩토리 전용 공고가 페이지 밖으로 밀려 누락되므로 별도 추가)
+COMMON_KEYWORDS = [
+    "로봇", "로보틱스", "자동화", "휴머노이드",
+    "머신비전", "협동로봇", "PLC", "ROS2",
+    "스마트팩토리", "자율주행", "자동화설비",
 ]
 
-# 분류 5종: 기획/매니징 · R&D · 필드 엔지니어 · 제조 · 영업
-# 우선순위 순으로 매칭 (앞에서 잡히면 그 분류로 확정)
-def classify(text: str) -> str:
-    if any(k in text for k in ["영업", "세일즈", "sales", "B2B", "마케팅", "기술영업"]):
-        return "영업"
-    if any(k in text for k in ["기획", "상품", "PM", "전략", "프로덕트", "경영", "관리", "운영",
-                               "총무", "인사", "HR", "재무", "구매", "매니저", "manager"]):
-        return "기획/매니징"
-    if any(k in text for k in ["필드", "설치", "시운전", "유지보수", "유지", "보수", "A/S", "AS",
-                               "티칭", "셋업", "세팅", "시공", "현장", "field", "서비스엔지니어"]):
-        return "필드 엔지니어"
-    if any(k in text for k in ["생산", "제조", "조립", "품질", "가공", "공정", "설비", "오퍼레이터",
-                               "operator", "QC", "QA", "검사"]):
-        return "제조"
-    if any(k in text for k in ["연구", "개발", "설계", "engineer", "엔지니어", "research", "R&D",
-                               "SW", "HW", "FW", "제어", "알고리즘", "AI", "비전", "소프트웨어", "펌웨어"]):
-        return "R&D"
-    return "R&D"  # 기본값
+# ▼ 사이트 우선순위 (앞에 있을수록 우선 — 중복 시 이 사이트 공고를 유지)
+SITE_PRIORITY = ["사람인", "잡코리아", "잡플래닛"]
+
+
+# ▼ 직무 5분류 — 우선순위 순으로 매칭(앞에서 잡히면 확정)
+#   기획/PM   : 매니징·프로덕트/사업 기획·전략 (엔지니어링 아님)
+#   영업      : 국내외 상품 영업·세일즈
+#   필드엔지니어: 현장 시운전·설치·셋업·유지보수
+#   생산/제조  : 실제 만드는 것 — 생산·제조·조립·양산
+#   R&D       : 실제 엔지니어링 — 제어·개발·설계·연구·알고리즘
+#
+# ★ 다중 분류 허용: 한 공고가 여러 분류에 속할 수 있다.
+#   특히 기획/PM은 1순위로, 엔지니어링 단어가 같이 있어도 기획/PM에 넣는다.
+#   (예: "로봇 개발 PM" → 기획/PM + R&D 둘 다)
+#   classify()는 분류 리스트를 반환한다. CSV엔 "기획/PM|R&D" 처럼 '|'로 저장.
+def classify(text: str):
+    t = text.replace(" ", "")
+    cats = []
+
+    # 영업
+    if any(k in t for k in ["영업", "세일즈", "sales", "Sales", "B2B", "B2C", "수주", "해외영업", "기술영업"]):
+        cats.append("영업")
+
+    # 기획/PM (1순위) — 엔지니어링 단어가 같이 있어도 포함 (중복 허용)
+    plan_kw = ["기획", "PM", "PO", "프로덕트", "product", "Product", "전략", "사업개발",
+               "사업기획", "상품기획", "프로젝트매니저", "프로젝트리더", "BizDev",
+               "매니저", "매니징", "매니지먼트", "운영기획", "운영관리"]
+    if any(k in t for k in plan_kw):
+        cats.append("기획/PM")
+
+    # 필드엔지니어
+    if any(k in t for k in ["시운전", "설치", "셋업", "세팅", "현장", "필드", "field", "Field",
+                            "유지보수", "보전", "A/S", "AS", "티칭", "시공", "서비스엔지니어", "설비보전"]):
+        cats.append("필드엔지니어")
+
+    # 생산/제조/조립
+    if any(k in t for k in ["생산", "제조", "조립", "양산", "가공", "공정", "오퍼레이터",
+                            "operator", "품질관리", "QC", "QA", "검사", "생산기술", "공장"]):
+        cats.append("생산/제조")
+
+    # R&D — 제어·개발·설계·연구·알고리즘
+    if any(k in t for k in ["개발", "설계", "제어", "엔지니어", "engineer", "연구", "알고리즘",
+                            "SW", "HW", "FW", "펌웨어", "임베디드", "소프트웨어", "하드웨어", "R&D"]):
+        cats.append("R&D")
+
+    if not cats:
+        cats = ["R&D"]  # 기본값
+    # CATEGORIES 순서로 정렬 + 중복 제거
+    return [c for c in CATEGORIES if c in cats]
+
+
+def classify_str(text: str) -> str:
+    """CSV 저장용: 분류 리스트를 '|'로 합침."""
+    return "|".join(classify(text))
+
+
+# 분류 라벨 목록 (UI 필터 노출 순서)
+CATEGORIES = ["기획/PM", "R&D", "필드엔지니어", "생산/제조", "영업"]
+
+# CSV 출력 경로 (HTML이 같은 폴더 상위에서 읽음)
+_ROOT = Path(__file__).resolve().parent.parent
+OUT_JOBS = _ROOT / "jobs.csv"
+OUT_COMPANIES = _ROOT / "companies.csv"
+OUT_CSV = OUT_JOBS  # 하위호환
+
+# jobs.csv 스키마 — id(사람인 rec_idx)로 누적 관리, company_id(csn)로 회사와 매칭
+JOB_COLUMNS = [
+    "id",           # 사람인 공고 고유번호(rec_idx) — 누적/중복 관리 키
+    "company_id",   # 회사 고유번호(csn) — companies.csv와 매칭 키
+    "company",      # 회사명
+    "role",         # 직무명
+    "category",     # 분류
+    "description",  # 직무 세부 설명
+    "requirements", # 필수·우대 조건
+    "location",     # 근무지
+    "deadline",     # 마감일
+    "salary",       # 연봉
+    "source",       # 출처 사이트
+    "url",          # 지원 링크
+    "status",       # 모집중 / 마감 (이번 스크래핑에 없으면 마감 처리)
+    "last_seen",    # 마지막으로 스크래핑에 잡힌 날짜(YYYY-MM-DD)
+]
+
+# companies.csv 스키마 — csn(id)로 누적 관리, 매출액은 DART로 보강
+COMPANY_COLUMNS = [
+    "id",           # 회사 고유번호(csn)
+    "name",         # 회사명
+    "revenue",      # 매출액 (DART OpenAPI)
+    "employees",    # 사원수 (사람인)
+    "founded",      # 설립 (사람인)
+    "biz_type",     # 기업형태 (사람인)
+    "industry",     # 업종 (사람인)
+    "homepage",     # 홈페이지 (사람인)
+    "last_updated", # 회사정보 갱신일(YYYY-MM-DD)
+    "url",          # 사람인 기업정보 링크
+]
+COLUMNS = JOB_COLUMNS  # 하위호환

@@ -5,18 +5,32 @@
 
 ```
 JD/
-├── jobs.csv              # 수집 결과 (단일 데이터 소스, 엑셀/깃으로 관리 용이)
-├── index.html            # jobs.csv를 불러와 검색/필터/정렬/스크랩으로 보여주는 UI
+├── jobs.csv              # 공고 데이터 (id=사람인 rec_idx 기준 누적 관리)
+├── companies.csv         # 회사 데이터 (id=csn 기준, 매출액 등) — jobs와 company_id로 매칭
+├── index.html            # 두 CSV를 불러와 join + 검색/필터/정렬/스크랩/숨김 UI
 ├── serve.py              # 로컬 서버 + '🔄 갱신' 버튼용 /scrape 엔드포인트
 ├── README.md
 └── scraper/
     ├── config.py             # ★ 분류별 검색 키워드 + 우선순위 + CSV 스키마 (여기만 고치면 됨)
-    ├── saramin_web.py        # 사람인 스크래퍼 (requests+bs4, API 키 불필요·실동작)
+    ├── saramin_web.py        # 공고 스크래퍼 (requests+bs4, API 키 불필요·실동작)
+    ├── saramin_company.py    # 기업정보 스크래퍼 (csn 기준 사원수/설립/업종 + DART 매출액)
     ├── jobkorea_playwright.py# 잡코리아 스크래퍼 (Playwright, 선택)
     ├── enrich_revenue.py     # DART OpenAPI로 매출액 보강 (선택)
-    ├── build_csv.py          # 오케스트레이터 → ../jobs.csv 생성
+    ├── build_csv.py          # 오케스트레이터 → ../jobs.csv, ../companies.csv 생성
     └── requirements.txt
 ```
+
+## ID 기반 누적 관리 (핵심)
+
+**전체 덮어쓰기가 아니라 ID 병합**이다. 갱신해도 찜/숨김(브라우저 localStorage) 기록은 보존된다.
+
+- `jobs.csv` — 사람인 공고 고유번호 `rec_idx`를 `id`로 사용.
+  - 이번 스크래핑에 잡힌 공고: `status=모집중`, `last_seen=오늘`로 갱신
+  - 안 잡힌 기존 공고: **삭제하지 않고 `status=마감`으로 표시** → 찜해둔 공고가 마감돼도 계속 보임
+- `companies.csv` — 회사 고유번호 `csn`을 `id`로 사용. 공고의 `company_id`와 매칭.
+  - 신규 회사 또는 `COMPANY_REFRESH_DAYS`(기본 30일)보다 오래된 회사만 다시 조회 → 매번 전체 재조회 안 함
+  - 매출액(`revenue`)은 **DART OpenAPI**로 보강. 사원수/설립/업종/홈페이지는 사람인 기업정보 페이지에서 파싱
+- HTML이 두 CSV를 불러와 `company_id`로 join, 매출액·사원수·업종을 표에 함께 표시
 
 ---
 
@@ -88,11 +102,16 @@ CATEGORY_QUERIES = {
 
 신입 필터는 사람인 `exp_cd=1`(신입)로 고정(`SARAMIN_EXP_CODES`).
 
-### CSV 스키마 (컬럼 순서)
+### CSV 스키마
 ```
-company, role, category, description, requirements, location, deadline, salary, revenue, source, url
-(회사  → 직무 → 분류 → 세부설명 → 조건 → 근무지 → 마감일 → 연봉 → 매출액 → 출처 → 링크)
+# jobs.csv
+id, company_id, company, role, category, description, requirements,
+location, deadline, salary, source, url, status, last_seen
+
+# companies.csv
+id, name, revenue, employees, founded, biz_type, industry, homepage, last_updated, url
 ```
+`jobs.company_id` ↔ `companies.id` 로 매칭. 매출액은 companies.csv에만 있고 HTML이 join해서 보여준다.
 
 ---
 
