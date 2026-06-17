@@ -16,3 +16,8 @@ scraper/.dart_key
 
 # 닉네임별 개인화 데이터(찜/숨김)
 userdata/
+
+# Cloudflare Wrangler (계정/KV id 등 — 커밋 금지)
+server/.wrangler/
+server/wrangler.toml
+server/node_modules/

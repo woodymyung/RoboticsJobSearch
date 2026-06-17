@@ -14,6 +14,7 @@ npm i -g wrangler           # Cloudflare CLI
 wrangler login              # 브라우저로 Cloudflare 로그인(무료 가입)
 
 cd server
+cp wrangler.toml.example wrangler.toml   # wrangler.toml은 gitignore됨(계정·KV id 보호)
 wrangler kv namespace create RJS    # 출력된 id를 wrangler.toml의 id= 에 붙여넣기
 wrangler deploy                     # → https://robotics-job-userdata.<당신>.workers.dev
 ```
