@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>기업 심층 리서치 · 로보틱스 채용</title>
+<style>
+  :root{ --bg:#0f1116; --card:#171a21; --line:#262b36; --text:#e6e8ec; --muted:#9aa3b2; --accent:#4f8cff; --chip:#1f2735; }
+  *{box-sizing:border-box;}
+  body{margin:0;font-family:"Pretendard","Apple SD Gothic Neo","Malgun Gothic",system-ui,sans-serif;background:var(--bg);color:var(--text);line-height:1.5;}
+  .wrap{max-width:1340px;margin:0 auto;padding:24px 20px 60px;}
+  a.navlink{display:inline-flex;align-items:center;gap:5px;color:var(--accent);text-decoration:none;font-size:14px;font-weight:600;}
+  a.navlink:hover{text-decoration:underline;}
+  a.navlink .lucide{width:16px;height:16px;vertical-align:-3px;}
+  h1{font-size:22px;margin:12px 0 4px;}
+  .sub{color:var(--muted);font-size:13px;margin-bottom:14px;}
+  .toolbar{display:flex;gap:10px;align-items:center;margin-bottom:14px;}
+  .ticon{color:var(--muted);display:flex;align-items:center;}
+  input[type=search]{flex:1;max-width:420px;padding:10px 14px;border-radius:10px;border:1px solid var(--line);background:var(--card);color:var(--text);font-size:14px;}
+  .count{color:var(--muted);font-size:13px;}
+  #cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(420px,1fr));gap:14px;}
+  .rcard{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:16px 18px;scroll-margin-top:20px;}
+  .rcard.hl{border-color:var(--accent);box-shadow:0 0 0 2px var(--accent) inset;}
+  .rcard h3{margin:0 0 4px;font-size:16px;color:#fff;}
+  .conf{font-size:10px;padding:1px 7px;border-radius:5px;margin-left:6px;vertical-align:2px;}
+  .conf.high{background:#13351f;color:#5fd08a;} .conf.medium{background:#2b2a14;color:#e0c34a;} .conf.low{background:#3a1c1c;color:#ff9a9a;}
+  .fld{margin-top:10px;font-size:12.5px;line-height:1.55;}
+  .fld b{color:var(--accent);font-weight:600;display:block;font-size:11.5px;margin-bottom:2px;}
+  .fld.tgt{background:#14304a33;border:1px solid #25496b;border-radius:8px;padding:8px 10px;}
+  a.joblink{display:inline-flex;align-items:center;gap:5px;margin-top:12px;padding:6px 12px;border-radius:8px;background:var(--accent);color:#fff;text-decoration:none;font-size:12.5px;font-weight:600;}
+  a.joblink:hover{opacity:.88;} a.joblink .lucide{width:14px;height:14px;}
+  details{margin-top:10px;font-size:11.5px;color:var(--muted);}
+  details a{color:var(--accent);display:block;margin:3px 0;word-break:break-all;}
+  .lucide{display:inline-block;}
+  .err{color:#ffb4b4;background:#3a1c1c;border:1px solid #6b2525;padding:14px;border-radius:10px;}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <a class="navlink" href="index.html"><i data-lucide="arrow-left"></i> 채용 공고 목록으로</a>
+  <h1>🔬 기업 심층 리서치</h1>
+  <div class="sub">사원수 200명 이상 회사의 메인 사업·진행 중 신사업·미래 먹거리·자소서 타겟팅 포인트 (뉴스·공시·CEO 인터뷰 근거) · <span id="count"></span></div>
+  <div class="toolbar">
+    <span class="ticon"><i data-lucide="search"></i></span>
+    <input type="search" id="rq" placeholder="회사명·사업·키워드 검색">
+  </div>
+  <div id="errbox"></div>
+  <div id="cards"></div>
+</div>
+
+<script src="https://unpkg.com/lucide@latest"></script>
+<script>
+let LIST = [];
+const params = new URLSearchParams(location.search);
+const HIGHLIGHT = params.get('company') || '';
+
+function parseCSV(text){
+  const out=[]; let row=[],field='',i=0,inQ=false;
+  text=text.replace(/^﻿/,'');
+  while(i<text.length){
+    const c=text[i];
+    if(inQ){ if(c==='"'&&text[i+1]==='"'){field+='"';i+=2;continue;} if(c==='"'){inQ=false;i++;continue;} field+=c;i++;continue; }
+    if(c==='"'){inQ=true;i++;continue;}
+    if(c===','){row.push(field);field='';i++;continue;}
+    if(c==='\r'){i++;continue;}
+    if(c==='\n'){row.push(field);out.push(row);row=[];field='';i++;continue;}
+    field+=c;i++;
+  }
+  if(field.length||row.length){row.push(field);out.push(row);}
+  const header=out.shift();
+  return out.filter(r=>r.length>1&&r.some(x=>x.trim())).map(r=>{ const o={}; header.forEach((h,idx)=>o[h.trim()]=(r[idx]||'').trim()); return o; });
+}
+function esc(s){ return (s||'').replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c])); }
+function srcLinks(s){
+  return (s||'').split(' | ').filter(Boolean).map(x=>{
+    const m=x.match(/(https?:\/\/\S+)/); const url=m?m[1]:'';
+    return url?`<a href="${esc(url)}" target="_blank" rel="noopener">${esc(x)}</a>`:`<span>${esc(x)}</span>`;
+  }).join('');
+}
+function render(term){
+  term=(term||'').trim().toLowerCase();
+  const list=LIST.filter(r=>!term||Object.values(r).join(' ').toLowerCase().includes(term));
+  document.getElementById('count').textContent=`${list.length}개사`;
+  document.getElementById('cards').innerHTML=list.map(r=>`
+    <div class="rcard" data-name="${esc(r.name)}">
+      <h3>${esc(r.name)}<span class="conf ${esc(r.confidence)}">${esc(r.confidence)}</span></h3>
+      <div class="fld"><b>메인 사업</b>${esc(r.main_business)||'—'}</div>
+      <div class="fld"><b>진행 중 신사업</b>${esc(r.new_business)||'—'}</div>
+      <div class="fld"><b>미래 먹거리</b>${esc(r.future)||'—'}</div>
+      <div class="fld tgt"><b>📌 자소서 타겟팅 포인트</b>${esc(r.targeting_point)||'—'}</div>
+      <a class="joblink" href="index.html?company=${encodeURIComponent(r.name)}"><i data-lucide="briefcase"></i> 이 회사 채용 공고 보기 <i data-lucide="arrow-right"></i></a>
+      ${r.sources?`<details><summary>출처</summary>${srcLinks(r.sources)}</details>`:''}
+    </div>`).join('') || '<div class="err">결과 없음</div>';
+  if(window.lucide) lucide.createIcons();
+}
+function highlight(name){
+  const el=document.querySelector(`.rcard[data-name="${CSS.escape(name)}"]`);
+  if(el){ el.classList.add('hl'); el.scrollIntoView({behavior:'smooth',block:'center'}); }
+}
+document.getElementById('rq').addEventListener('input', e=>render(e.target.value));
+
+fetch('companies_deepresearch.csv').then(r=>{if(!r.ok)throw new Error('HTTP '+r.status);return r.text();})
+  .then(t=>{ LIST=parseCSV(t); render(''); if(HIGHLIGHT) setTimeout(()=>highlight(HIGHLIGHT),100); })
+  .catch(()=>{ document.getElementById('errbox').innerHTML='<div class="err">companies_deepresearch.csv 로드 실패. python3 serve.py 로 접속하거나 GitHub Pages에서 여세요.</div>'; });
+if(window.lucide) lucide.createIcons();
+</script>
+</body>
+</html>
