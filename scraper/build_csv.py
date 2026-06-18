@@ -18,9 +18,8 @@ import datetime
 from config import JOB_COLUMNS, COMPANY_COLUMNS, OUT_JOBS, OUT_COMPANIES, SITE_PRIORITY
 from saramin_web import fetch_saramin
 from jobkorea_web import fetch_jobkorea
-from jobplanet_playwright import fetch_jobplanet
+from jobplanet_web import fetch_jobplanet
 from jobkorea_company import fetch_companies  # 잡코리아(매출) + 사람인(사원수) 결합
-from jobkorea_csn import resolve_csns          # 잡코리아 공고 → 사람인 csn 해석
 
 TODAY = datetime.date.today().isoformat()
 REFRESH_DAYS = int(os.environ.get("COMPANY_REFRESH_DAYS", "30"))
@@ -47,56 +46,70 @@ def write_csv(path, columns, rows):
 
 
 def _norm(s):
-    """회사명/직무명 정규화 — 사이트 간 중복 판정용."""
-    s = (s or "").lower()
-    s = re.sub(r"[\s\(\)（）㈜\[\]【】·,./'\"-]", "", s)
-    s = s.replace("주식회사", "").replace("(주)", "")
-    return s
+    """회사명/직무명 정규화 — 사이트 간 중복 판정용.
+    법인격 표기((주)·㈜·주식회사 등)를 먼저 제거한 뒤 기호/공백을 제거한다."""
+    n = re.sub(r"㈜|\((?:주|유|사|재|합|학|의)\)|주식회사", "", s or "")
+    n = re.sub(r"[\s\(\)（）\[\]【】·,./'\"-]", "", n)
+    return n.lower()
 
 
 def collect_multisite():
-    """SITE_PRIORITY 순서로 사이트별 수집 후, (회사+직무) 기준 교차 중복 제거.
-    우선순위 높은 사이트의 공고를 유지한다."""
+    """모든 사이트의 공고를 수집해 합친다.
+    (회사+직무+분류) 완전일치 중복은 status/마감일을 아는 merge 이후 dedup_jobs에서 처리한다."""
     fetchers = {
         "사람인": fetch_saramin,
         "잡코리아": fetch_jobkorea,
         "잡플래닛": fetch_jobplanet,
     }
-    out, seen = [], set()
+    out = []
     for site in SITE_PRIORITY:
         fn = fetchers.get(site)
         if not fn:
             continue
         rows = fn() or []
-        kept = 0
-        for r in rows:
-            key = (_norm(r.get("company")), _norm(r.get("role")))
-            if key in seen:
-                continue  # 이미 더 높은 우선순위 사이트에 있음
-            seen.add(key)
-            out.append(r)
-            kept += 1
-        print(f"[multisite] {site}: {len(rows)}건 중 {kept}건 채택(교차 중복 제외)")
-    _fill_missing_csn(out)
+        out.extend(rows)
+        print(f"[multisite] {site}: {len(rows)}건 수집")
     return out
 
 
-def _fill_missing_csn(rows):
-    """csn 없는 공고(잡코리아 등)에 사람인 기업검색으로 csn을 채워
-    companies.csv 및 DART/규모 보강과 연결되게 한다."""
-    names = [r.get("company") for r in rows if not r.get("company_id") and r.get("company")]
-    if not names:
-        return
-    print(f"[csn] csn 미보유 공고의 회사 {len(set(names))}개 해석 시도")
-    name2csn = resolve_csns(names)
-    filled = 0
-    for r in rows:
-        if not r.get("company_id"):
-            csn = name2csn.get(r.get("company"))
-            if csn:
-                r["company_id"] = csn
-                filled += 1
-    print(f"[csn] 공고 {filled}건에 csn 채움")
+def _deadline_rank(deadline):
+    """마감 임박도(작을수록 임박). 'MM/DD'는 남은 일수, 상시/미정/형식불명은 큰 값."""
+    s = (deadline or "").strip()
+    m = re.match(r"(\d{1,2})/(\d{1,2})", s)
+    if not m:
+        return 10 ** 6  # 상시·미정 → 맨 뒤
+    mo, da = int(m.group(1)), int(m.group(2))
+    today = datetime.date.today()
+    try:
+        due = datetime.date(today.year, mo, da)
+    except ValueError:
+        return 10 ** 6
+    if due < today - datetime.timedelta(days=1):
+        due = datetime.date(today.year + 1, mo, da)  # 연말→연초 보정
+    return (due - today).days
+
+
+def dedup_jobs(jobs):
+    """(회사+직무+분류) 완전일치 중복을 1건으로 축약.
+    선택 규칙: ① 모집중을 마감보다 우선(=마감 지났어도 살아있는 동일공고 노출),
+              ② 그 안에서 마감 임박(가까운 마감일) 우선."""
+    groups = {}
+    for j in jobs:
+        key = (_norm(j.get("company")), _norm(j.get("role")), j.get("category", ""))
+        groups.setdefault(key, []).append(j)
+
+    def pick_key(j):
+        alive = 0 if j.get("status") == "모집중" else 1
+        return (alive, _deadline_rank(j.get("deadline")))
+
+    out, dropped = [], 0
+    for grp in groups.values():
+        if len(grp) > 1:
+            grp.sort(key=pick_key)
+            dropped += len(grp) - 1
+        out.append(grp[0])
+    print(f"[dedup] (회사+직무+분류) 완전일치 중복 {dropped}건 제거 → {len(out)}건")
+    return out
 
 
 def merge_jobs(scraped):
@@ -165,6 +178,7 @@ def manage_companies(jobs):
 def main():
     scraped = collect_multisite()
     jobs = merge_jobs(scraped)
+    jobs = dedup_jobs(jobs)
     write_csv(OUT_JOBS, JOB_COLUMNS, jobs)
 
     companies = manage_companies(jobs)

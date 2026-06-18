@@ -70,7 +70,7 @@ def main():
     comps = _read(OUT_COMPANIES, COMPANY_COLUMNS)
     name2id = {_norm(c["name"]): c["id"] for c in comps if c.get("name")}
 
-    jk = [r for r in jobs if r["source"] == "잡코리아"]
+    jk = [r for r in jobs if not r.get("company_id") and r.get("company")]
     matched, todo = 0, {}   # todo: {norm: 원본명}
     for r in jk:
         nm = _norm(r["company"])
@@ -81,7 +81,7 @@ def main():
             matched += 1
         else:                              # ② 신규 → DART 조회 대상
             todo.setdefault(nm, r["company"])
-    print(f"[link] 잡코리아 공고 {len(jk)}건 · 기존 회사 연결 {matched}건 · 신규 회사 {len(todo)}개 DART 조회")
+    print(f"[link] company_id 미보유 공고 {len(jk)}건 · 기존 회사 연결 {matched}건 · 신규 회사 {len(todo)}개 DART 조회")
 
     # ② 신규 회사 병렬 보강
     new_rows = []

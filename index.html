@@ -24,8 +24,13 @@
   .filters button[data-f="fav"].active{background:var(--star);color:#1a1a1a;border-color:var(--star);}
   .filters button[data-f="hidden"].active{background:#6b2525;color:#fff;border-color:#8a3030;}
   .export{padding:8px 14px;border-radius:8px;border:1px solid var(--line);background:var(--chip);color:var(--text);cursor:pointer;font-size:13px;}
-  select#region,select#revRange{padding:8px 12px;border-radius:999px;border:1px solid var(--line);background:var(--chip);color:var(--text);font-size:13px;cursor:pointer;}
-  select#region.on,select#revRange.on{background:var(--accent);color:#fff;border-color:var(--accent);}
+  select#region,select#revRange,.ddbtn{-webkit-appearance:none;-moz-appearance:none;appearance:none;padding:8px 30px 8px 12px;border-radius:999px;border:1px solid var(--line);background-color:var(--chip);background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%239aa3b2' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><polyline points='6 9 12 15 18 9'/></svg>");background-repeat:no-repeat;background-position:right 10px center;color:var(--text);font-size:13px;cursor:pointer;}
+  select#region.on,select#revRange.on,.ddbtn.on{background-color:var(--accent);color:#fff;border-color:var(--accent);background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%23ffffff' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><polyline points='6 9 12 15 18 9'/></svg>");}
+  .dropdown{position:relative;display:inline-block;}
+  .ddmenu{position:absolute;z-index:30;top:calc(100% + 4px);left:0;background:var(--card);border:1px solid var(--line);border-radius:10px;padding:6px;min-width:150px;box-shadow:0 8px 24px rgba(0,0,0,.45);}
+  .ddmenu label{display:flex;align-items:center;gap:8px;padding:7px 10px;border-radius:6px;color:var(--text);font-size:13px;cursor:pointer;}
+  .ddmenu label:hover{background:var(--chip);}
+  .ddmenu input{cursor:pointer;}
   .wrap{max-width:1340px;margin:0 auto;padding:0 20px 60px;overflow-x:auto;}
   table{width:100%;border-collapse:collapse;font-size:13.5px;background:var(--card);border-radius:12px;overflow:hidden;}
   thead th{position:sticky;top:0;background:#1d2230;color:var(--muted);text-align:left;padding:12px;font-weight:600;border-bottom:1px solid var(--line);white-space:nowrap;cursor:default;}
@@ -131,6 +136,14 @@
     <option value="1000-">1000억 이상</option>
     <option value="none">매출 미상</option>
   </select>
+  <span id="srcDropdown" class="dropdown" title="채용사이트 필터(복수선택)">
+    <button type="button" id="srcBtn" class="ddbtn">채용사이트 전체</button>
+    <div class="ddmenu" id="srcMenu" hidden>
+      <label><input type="checkbox" value="사람인" checked> 사람인</label>
+      <label><input type="checkbox" value="잡코리아" checked> 잡코리아</label>
+      <label><input type="checkbox" value="잡플래닛" checked> 잡플래닛</label>
+    </div>
+  </span>
   <label style="color:var(--muted);font-size:13px;display:flex;align-items:center;gap:6px;cursor:pointer;"><input type="checkbox" id="hideClosed" checked> 마감 숨기기</label>
   <button class="export" id="exportFav"><i data-lucide="download"></i> 찜 CSV 내보내기</button>
   <button class="export" id="refresh" title="serve.py 실행 중일 때만 동작"><i data-lucide="refresh-cw"></i> <span id="refreshLabel">갱신</span></button>
@@ -168,6 +181,7 @@
 <script src="https://unpkg.com/lucide@latest"></script>
 <script>
 let DATA = [], COMPANIES = {}, filter = 'all', region = 'all', revRange = 'all', sortK = null, sortAsc = true, hideClosed = true;
+let sources = new Set(['사람인','잡코리아','잡플래닛']);  // 채용사이트 필터(복수선택, 기본 전체)
 let RESEARCH = {}, RESEARCH_LIST = [];   // 기업 심층 리서치 (회사명 기준)
 
 // 매출액 문자열("273억 1백만원(2025.12.31)") -> 억 단위 숫자. 없으면 null.
@@ -331,8 +345,9 @@ function visible(){
     const okF = (filter==='all'||filter==='hidden') ? true : filter==='fav' ? FAV.has(k) : cats.includes(filter);
     const okR = region==='all' || regionOf(d.location)===region;
     const okRev = revInRange(d);
+    const okS = sources.size===0 || sources.has(d.source);
     const blob=Object.values(d).join(' ').toLowerCase();
-    return okF && okR && okRev && (term===''||blob.includes(term));
+    return okF && okR && okRev && okS && (term===''||blob.includes(term));
   });
   const keyFns={deadline:d=>ddDays(d.deadline), revenue:revNum, employees:empNum};
   if(sortK && keyFns[sortK]){
@@ -483,6 +498,20 @@ document.getElementById('revRange').addEventListener('change', e=>{
   e.target.classList.toggle('on', revRange!=='all');
   resetPage(); render();
 });
+(function(){
+  const dd=document.getElementById('srcDropdown'), btn=document.getElementById('srcBtn'), menu=document.getElementById('srcMenu');
+  const boxes=[...menu.querySelectorAll('input[type=checkbox]')];
+  function sync(){
+    sources=new Set(boxes.filter(b=>b.checked).map(b=>b.value));
+    const all=boxes.every(b=>b.checked);
+    btn.textContent=all?'채용사이트 전체':`채용사이트 ${sources.size}개`;
+    btn.classList.toggle('on', !all);
+  }
+  btn.addEventListener('click', e=>{ e.stopPropagation(); menu.hidden=!menu.hidden; });
+  menu.addEventListener('click', e=>e.stopPropagation());
+  boxes.forEach(b=>b.addEventListener('change', ()=>{ sync(); resetPage(); render(); }));
+  document.addEventListener('click', ()=>{ menu.hidden=true; });
+})();
 document.querySelectorAll('#filters button').forEach(b=>b.addEventListener('click',()=>{
   document.querySelectorAll('#filters button').forEach(x=>x.classList.remove('active'));
   b.classList.add('active'); filter=b.dataset.f; resetPage(); render();
