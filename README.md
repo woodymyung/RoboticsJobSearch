@@ -21,7 +21,8 @@ JD/
     ├── jobkorea_company.py   # 회사정보: 잡코리아 매출/사원수 + 사람인 fallback + DART 매출
     ├── saramin_company.py    # 사람인 기업정보 파서(csn 기준 사원수/설립/업종)
     ├── enrich_revenue.py     # DART OpenAPI 매출액 (회사명 100% 일치)
-    ├── jobkorea_playwright.py / jobplanet_playwright.py   # 공고 멀티사이트(선택, Playwright)
+    ├── jobkorea_web.py       # 공고: 잡코리아(requests + Next.js SSR JSON, 브라우저 불필요)
+    ├── jobplanet_playwright.py   # 공고: 잡플래닛(선택, Playwright)
     ├── build_csv.py          # 오케스트레이터 → ../jobs.csv, ../companies.csv 생성
     └── requirements.txt
 ```
@@ -161,7 +162,8 @@ name, main_business, new_business, future, targeting_point, sources, confidence
 | 소스 | 방식 | 비고 |
 |---|---|---|
 | **사람인(공고)** | requests + bs4 | 서버 렌더링, 키 불필요·실동작. 기본 수집원 |
-| **잡코리아/잡플래닛(공고)** | Playwright (선택) | JS·anti-bot. 미설치 시 자동 건너뜀. `pip install playwright && playwright install chromium` 후 활성화 |
+| **잡코리아(공고)** | requests + Next.js SSR JSON 파싱 | `/Search/` 응답 HTML의 `self.__next_f` 페이로드에 공고 JSON 내장 → 브라우저 불필요·실동작. 사람인에 없는 공고 보강. csn 없어 회사정보 미연결 |
+| **잡플래닛(공고)** | Playwright (선택) | JS·로그인 게이트. 미설치 시 자동 건너뜀. `pip install playwright && playwright install chromium` 후 활성화 |
 | **매출액** | DART OpenAPI | 공식·정확. **회사명 100% 일치 + 동명이인 모호 시 제외**(오매칭 방지). 상장·외감기업 위주 |
 | **사원수/규모/업종** | 잡코리아 + 사람인(csn) | 잡코리아 회사 프로필(매출/사원수) + 사람인 fallback(국민연금 사원수) |
 | **리멤버** | 미지원 | 앱/로그인 전용 — 자동 스크래핑 비현실적 |

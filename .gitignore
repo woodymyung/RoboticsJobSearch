@@ -21,3 +21,4 @@ userdata/
 server/.wrangler/
 server/wrangler.toml
 server/node_modules/
+.env

@@ -17,9 +17,10 @@ import datetime
 
 from config import JOB_COLUMNS, COMPANY_COLUMNS, OUT_JOBS, OUT_COMPANIES, SITE_PRIORITY
 from saramin_web import fetch_saramin
-from jobkorea_playwright import fetch_jobkorea
+from jobkorea_web import fetch_jobkorea
 from jobplanet_playwright import fetch_jobplanet
 from jobkorea_company import fetch_companies  # 잡코리아(매출) + 사람인(사원수) 결합
+from jobkorea_csn import resolve_csns          # 잡코리아 공고 → 사람인 csn 해석
 
 TODAY = datetime.date.today().isoformat()
 REFRESH_DAYS = int(os.environ.get("COMPANY_REFRESH_DAYS", "30"))
@@ -76,7 +77,26 @@ def collect_multisite():
             out.append(r)
             kept += 1
         print(f"[multisite] {site}: {len(rows)}건 중 {kept}건 채택(교차 중복 제외)")
+    _fill_missing_csn(out)
     return out
+
+
+def _fill_missing_csn(rows):
+    """csn 없는 공고(잡코리아 등)에 사람인 기업검색으로 csn을 채워
+    companies.csv 및 DART/규모 보강과 연결되게 한다."""
+    names = [r.get("company") for r in rows if not r.get("company_id") and r.get("company")]
+    if not names:
+        return
+    print(f"[csn] csn 미보유 공고의 회사 {len(set(names))}개 해석 시도")
+    name2csn = resolve_csns(names)
+    filled = 0
+    for r in rows:
+        if not r.get("company_id"):
+            csn = name2csn.get(r.get("company"))
+            if csn:
+                r["company_id"] = csn
+                filled += 1
+    print(f"[csn] 공고 {filled}건에 csn 채움")
 
 
 def merge_jobs(scraped):

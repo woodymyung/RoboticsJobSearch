@@ -131,7 +131,7 @@
     <option value="1000-">1000억 이상</option>
     <option value="none">매출 미상</option>
   </select>
-  <label style="color:var(--muted);font-size:13px;display:flex;align-items:center;gap:6px;cursor:pointer;"><input type="checkbox" id="hideClosed"> 마감 숨기기</label>
+  <label style="color:var(--muted);font-size:13px;display:flex;align-items:center;gap:6px;cursor:pointer;"><input type="checkbox" id="hideClosed" checked> 마감 숨기기</label>
   <button class="export" id="exportFav"><i data-lucide="download"></i> 찜 CSV 내보내기</button>
   <button class="export" id="refresh" title="serve.py 실행 중일 때만 동작"><i data-lucide="refresh-cw"></i> <span id="refreshLabel">갱신</span></button>
 </div>
@@ -167,7 +167,7 @@
 </script>
 <script src="https://unpkg.com/lucide@latest"></script>
 <script>
-let DATA = [], COMPANIES = {}, filter = 'all', region = 'all', revRange = 'all', sortK = null, sortAsc = true, hideClosed = false;
+let DATA = [], COMPANIES = {}, filter = 'all', region = 'all', revRange = 'all', sortK = null, sortAsc = true, hideClosed = true;
 let RESEARCH = {}, RESEARCH_LIST = [];   // 기업 심층 리서치 (회사명 기준)
 
 // 매출액 문자열("273억 1백만원(2025.12.31)") -> 억 단위 숫자. 없으면 null.
