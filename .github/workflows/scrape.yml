@@ -1,0 +1,39 @@
+name: Daily Scrape
+
+on:
+  schedule:
+    - cron: '0 22 * * *'  # 매일 07:00 KST (UTC+9 기준 전날 22:00 UTC)
+  workflow_dispatch:       # 수동 실행 버튼
+
+jobs:
+  scrape:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: |
+          pip install requests playwright beautifulsoup4 curl_cffi lxml
+          playwright install chromium --with-deps
+
+      - name: Run scraper
+        working-directory: scraper
+        env:
+          DART_API_KEY: ${{ secrets.DART_API_KEY }}
+        run: python3 build_csv.py
+
+      - name: Commit updated CSVs
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add jobs.csv companies.csv
+          git diff --cached --quiet || git commit -m "auto: 스크래핑 갱신 $(date +'%Y-%m-%d')"
+          git push
