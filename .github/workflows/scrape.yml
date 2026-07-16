@@ -5,6 +5,9 @@ on:
     - cron: '0 22 * * *'  # 매일 07:00 KST (UTC+9 기준 전날 22:00 UTC)
   workflow_dispatch:       # 수동 실행 버튼
 
+permissions:
+  contents: write
+
 jobs:
   scrape:
     runs-on: ubuntu-latest
