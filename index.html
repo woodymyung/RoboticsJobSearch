@@ -296,17 +296,33 @@ function esc(s){ return (s||'').replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>'
 function csvCell(s){ s=(s==null?'':String(s)); return /[",\n]/.test(s)?'"'+s.replace(/"/g,'""')+'"':s; }
 function keyOf(d){ return d.url || (d.company+'|'+d.role); }
 
-// 마감일 -> 표시/긴급도. "06/20(토)" 형태에서 임박 여부 판단.
+const _DOW = ['일','월','화','수','목','금','토'];
+function _today(){ const n=new Date(); return new Date(n.getFullYear(),n.getMonth(),n.getDate()); }
+
+// raw deadline → {due: Date|null, days: number|null}
+// MM/DD, MM/DD(요일), 오늘마감, 내일마감 등 모든 포맷 지원
+function _parseDue(raw){
+  if(!raw) return {due:null, days:null};
+  const today=_today();
+  if(/오늘/.test(raw)) return {due:today, days:0};
+  if(/내일/.test(raw)){ const d=new Date(today); d.setDate(d.getDate()+1); return {due:d, days:1}; }
+  const m=raw.match(/(\d{1,2})\/(\d{1,2})/);
+  if(m){
+    let due=new Date(today.getFullYear(), +m[1]-1, +m[2]);
+    if(due < today) due=new Date(today.getFullYear()+1, +m[1]-1, +m[2]);
+    const days=Math.round((due-today)/864e5);
+    return {due, days};
+  }
+  return {due:null, days:null};
+}
+
+// 마감일 -> 표시/긴급도. 모든 케이스를 "MM/DD(요일) (D-N)" 형태로 통일.
 function ddInfo(raw){
   if(!raw) return {txt:'상시/미정', cls:'none'};
-  if(/내일|오늘|D-?[0-3]\b/.test(raw)) return {txt:raw, cls:'soon'};
-  const m = raw.match(/(\d{1,2})\/(\d{1,2})/);
-  if(m){
-    const now=new Date(), mo=+m[1]-1, da=+m[2];
-    let due=new Date(now.getFullYear(), mo, da);
-    if(due < now-864e5) due=new Date(now.getFullYear()+1, mo, da); // 연말->연초 보정
-    const days=Math.ceil((due-now)/864e5);
-    return {txt: raw + (days>=0?` (D-${days})`:''), cls: days<=7?'soon':'normal'};
+  const {due, days}=_parseDue(raw);
+  if(due!==null){
+    const dateStr=`${String(due.getMonth()+1).padStart(2,'0')}/${String(due.getDate()).padStart(2,'0')}(${_DOW[due.getDay()]})`;
+    return {txt:`${dateStr} (D-${days})`, cls:days<=7?'soon':'normal'};
   }
   return {txt:raw, cls:'normal'};
 }
@@ -314,9 +330,9 @@ function ddInfo(raw){
 // 마감일 -> 남은 일수(숫자). 미정/상시는 맨 뒤로 가도록 큰 값.
 function ddDays(raw){
   if(!raw) return 1e9;
-  if(/오늘/.test(raw)) return 0;
-  if(/내일/.test(raw)) return 1;
-  const m=raw.match(/(\d{1,2})\/(\d{1,2})/);
+  const {days}=_parseDue(raw);
+  if(days!==null) return days;
+  const m=raw.match(/(\d{1,2})\/(\d{1,2})/);  // fallback (unreachable but safe)
   if(m){
     const now=new Date(), mo=+m[1]-1, da=+m[2];
     let due=new Date(now.getFullYear(),mo,da);
